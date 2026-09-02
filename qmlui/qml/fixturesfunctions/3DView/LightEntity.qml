@@ -69,6 +69,7 @@ Entity
     /* Derived exactly like Fixture3DItem so that changing the beam aperture
        (zoom) keeps the cone geometry consistent. */
     property real coneBottomRadius: distCutoff * Math.tan(cutoffAngle) + coneTopRadius
+    property real beamEdgeSoftness: 0
     property Texture2D goboTexture
     property real goboRotation: 0
 

@@ -73,6 +73,10 @@ Entity
     property real focusMaxDegrees: 5
     property real distCutoff: 40.0
     property real cutoffAngle: (focusMinDegrees / 2) * (Math.PI / 180)
+    /** Beam edge softness, shared by every emitter of the bar.
+        See Fixture3DItem, which carries the same properties */
+    property real focusFactor: 1.0
+    property real beamEdgeSoftness: View3D.beamEdgeSoftness * focusFactor
 
     /* **************** Rendering quality properties **************** */
     property bool useScattering: View3D.renderQuality === MainView3D.LowQuality ? false : true
@@ -186,7 +190,8 @@ Entity
                 "distCutoff": Qt.binding(function() { return fixtureEntity.distCutoff }),
                 "headLength": Qt.binding(function() { return fixtureEntity.headLength }),
                 "coneTopRadius": Qt.binding(function() { return fixtureEntity.coneTopRadius }),
-                "goboTexture": Qt.binding(function() { return fixtureEntity.goboTexture })
+                "goboTexture": Qt.binding(function() { return fixtureEntity.goboTexture }),
+                "beamEdgeSoftness": Qt.binding(function() { return fixtureEntity.beamEdgeSoftness })
             });
 
             if (headNode === null)
@@ -331,6 +336,11 @@ Entity
     function setShutter(type, low, high)
     {
         sAnimator.setShutter(type, low, high)
+    }
+
+    function setFocus(value)
+    {
+        focusFactor = 1.0 - ((0.9 * value) / 255.0)
     }
 
     // Same signature as Fixture3DItem: MainView3D calls this with degrees == true

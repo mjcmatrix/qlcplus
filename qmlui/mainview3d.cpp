@@ -1544,6 +1544,12 @@ void MainView3D::updateFixtureItem(Fixture *fixture, quint16 headIndex, quint16 
                     case QLCChannel::BeamZoomBigSmall:
                         QMetaObject::invokeMethod(fixtureItem, "setZoom", Q_ARG(QVariant, 255 - value), Q_ARG(QVariant, false));
                     break;
+                    case QLCChannel::BeamFocusNearFar:
+                        QMetaObject::invokeMethod(fixtureItem, "setFocus", Q_ARG(QVariant, value));
+                    break;
+                    case QLCChannel::BeamFocusFarNear:
+                        QMetaObject::invokeMethod(fixtureItem, "setFocus", Q_ARG(QVariant, 255 - value));
+                    break;
                     default:
                     break;
                 }
@@ -2711,7 +2717,23 @@ void MainView3D::applyRenderSettings()
     emit renderQualityChanged(renderQuality());
     emit ambientIntensityChanged(ambientIntensity());
     emit smokeAmountChanged(smokeAmount());
+    emit beamEdgeSoftnessChanged(beamEdgeSoftness());
     applyFrameCountEnabled(m_monProps->showFPS());
+}
+
+float MainView3D::beamEdgeSoftness() const
+{
+    return m_monProps->beamEdgeSoftness();
+}
+
+void MainView3D::setBeamEdgeSoftness(float beamEdgeSoftness)
+{
+    if (float(m_monProps->beamEdgeSoftness()) == beamEdgeSoftness)
+        return;
+
+    m_monProps->setBeamEdgeSoftness(beamEdgeSoftness);
+    m_doc->setModified();
+    emit beamEdgeSoftnessChanged(beamEdgeSoftness);
 }
 
 bool MainView3D::rayIntersectsAABB(const QVector3D &rayOrigin, const QVector3D &rayDir,

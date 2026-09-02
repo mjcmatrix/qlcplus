@@ -153,6 +153,11 @@ public:
     inline void setSmokeAmount(qreal amount) { m_smokeAmount = amount; }
     inline qreal smokeAmount() const { return m_smokeAmount; }
 
+    /** Get/Set how soft the 3D view beam edges are, as a fraction of the
+     *  beam radius (0.0 - 1.0). 0 means beams cut off sharply */
+    inline void setBeamEdgeSoftness(qreal softness) { m_beamEdgeSoftness = softness; }
+    inline qreal beamEdgeSoftness() const { return m_beamEdgeSoftness; }
+
     /** Get/Set whether the 3D view FPS counter overlay is shown */
     inline void setShowFPS(bool show) { m_showFPS = show; }
     inline bool showFPS() const { return m_showFPS; }
@@ -161,6 +166,7 @@ private:
     int m_renderQuality;
     qreal m_ambientLightIntensity;
     qreal m_smokeAmount;
+    qreal m_beamEdgeSoftness;
     bool m_showFPS;
 
     /********************************************************************

@@ -49,6 +49,23 @@ uniform sampler2D shadowTex;
 
 uniform float headLength;
 
+// Softness of the beam's outer edge, as a fraction of the cone radius at the
+// point being lit. A real lens does not cut off sharply, and how soft the cut
+// is depends on where the fixture is focused. 0 leaves the beam hard edged
+uniform float beamEdgeSoftness;
+
+// Fade the beam towards its rim. 'offset' is the point's offset from the beam
+// axis in light space and 'radius' the radius of the cone there, so their
+// ratio is 1.0 exactly on the rim
+float beamPenumbra(vec2 offset, float radius)
+{
+    if (beamEdgeSoftness <= 0.0)
+        return 1.0;
+
+    float soft = min(beamEdgeSoftness, 1.0);
+    return 1.0 - smoothstep(1.0 - soft, 1.0, length(offset) / radius);
+}
+
 void main()
 {
 
@@ -77,7 +94,7 @@ void main()
     vec2 tc = (mat2x2(goboRotation.x, goboRotation.y, goboRotation.z, goboRotation.w) * ((-q.xy) * (1.0 / r))) * 0.5 + 0.5;
 
     vec4 gSample = SAMPLE_TEX2D(goboTex, tc.xy);
-    float goboMask = gSample.a * gSample.r;
+    float goboMask = gSample.a * gSample.r * beamPenumbra(q.xy, r);
 
     vec3 finalColor = shadowMask * goboMask * lightColor * lightIntensity * max(0, dot(normal, -lightDir)) * albedo;
 

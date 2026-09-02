@@ -109,6 +109,7 @@ class MainView3D final : public PreviewContext
     Q_PROPERTY(int stageIndex READ stageIndex WRITE setStageIndex NOTIFY stageIndexChanged)
     Q_PROPERTY(float ambientIntensity READ ambientIntensity WRITE setAmbientIntensity NOTIFY ambientIntensityChanged)
     Q_PROPERTY(float smokeAmount READ smokeAmount WRITE setSmokeAmount NOTIFY smokeAmountChanged)
+    Q_PROPERTY(float beamEdgeSoftness READ beamEdgeSoftness WRITE setBeamEdgeSoftness NOTIFY beamEdgeSoftnessChanged)
 
     Q_PROPERTY(bool frameCountEnabled READ frameCountEnabled WRITE setFrameCountEnabled NOTIFY frameCountEnabledChanged)
     Q_PROPERTY(int FPS READ FPS NOTIFY FPSChanged)
@@ -512,6 +513,11 @@ public:
     float smokeAmount() const;
     void setSmokeAmount(float smokeAmount);
 
+    /** Get/Set how soft the beam edges are, as a fraction of the
+     *  beam radius. 0 means beams cut off sharply */
+    float beamEdgeSoftness() const;
+    void setBeamEdgeSoftness(float beamEdgeSoftness);
+
     Q_INVOKABLE void pickEntity(const float &aspect, const QVector2D &ndcMousePos, int modifiers) const;
 
 protected:
@@ -533,6 +539,7 @@ signals:
     void stageIndexChanged(int stageIndex);
     void ambientIntensityChanged(qreal ambientIntensity);
     void smokeAmountChanged(float smokeAmount);
+    void beamEdgeSoftnessChanged(float beamEdgeSoftness);
 
 private:
     /* The "Rendering" settings (quality, ambient light, smoke, show FPS) are
