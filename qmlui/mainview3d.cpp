@@ -2923,8 +2923,15 @@ void GoboTextureImage::paint(QPainter *painter)
     int w = painter->device()->width();
     int h = painter->device()->height();
 
+    // The mask is sampled as a continuous function of the distance from the beam
+    // axis, so its own edges want to be smooth: without this the aperture, and
+    // every gobo drawn inside it, lands on the beam as a stair-stepped outline
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    painter->setRenderHint(QPainter::SmoothPixmapTransform, true);
+
     painter->fillRect(0, 0, w, h, Qt::black);
     painter->setBrush(QBrush(Qt::white));
+    painter->setPen(Qt::NoPen);
     painter->drawEllipse(2, 2, w - 4, h - 4);
     if (m_renderer)
     {

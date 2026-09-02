@@ -350,7 +350,15 @@ Entity
         }
 
     /* **************** Gobo properties **************** */
-    property Texture2D goboTexture: Texture2D { }
+    property Texture2D goboTexture:
+        Texture2D
+        {
+            // sampled at whatever resolution the beam happens to cover, so it
+            // needs filtering: the Qt3D default of Nearest re-introduces the
+            // stair steps the mask is painted smooth to avoid
+            magnificationFilter: Texture.Linear
+            minificationFilter: Texture.Linear
+        }
     property real goboRotation: 0
 
     function setGoboSpeed(cw, speed)

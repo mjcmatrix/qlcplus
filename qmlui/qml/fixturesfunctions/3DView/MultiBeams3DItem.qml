@@ -416,7 +416,15 @@ Entity
         ]
     }
 
-    property Texture2D goboTexture: Texture2D { }
+    property Texture2D goboTexture:
+        Texture2D
+        {
+            // sampled at whatever resolution the beam happens to cover, so it
+            // needs filtering: the Qt3D default of Nearest re-introduces the
+            // stair steps the mask is painted smooth to avoid
+            magnificationFilter: Texture.Linear
+            minificationFilter: Texture.Linear
+        }
 
     /* headEntity is NOT listed here: it is an Entity, not a Component, so QML
        rejected it with a "Cannot append ... to a QML list of QComponent*"
