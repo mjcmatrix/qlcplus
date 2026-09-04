@@ -56,6 +56,7 @@
 #define KXMLQLCMonitorRenderAmbient     QStringLiteral("Ambient")
 #define KXMLQLCMonitorRenderSmoke       QStringLiteral("Smoke")
 #define KXMLQLCMonitorRenderFxLight     QStringLiteral("FixtureLight")
+#define KXMLQLCMonitorRenderLumens      QStringLiteral("Lumens")
 #define KXMLQLCMonitorRenderShowFPS     QStringLiteral("ShowFPS")
 
 #define KXMLQLCMonitorScaleLock     QStringLiteral("ScaleLock")
@@ -97,6 +98,8 @@
 #define RENDER_DEFAULT_SMOKE    0.8
 /* Unscaled: a project that has never touched this renders exactly as before */
 #define RENDER_DEFAULT_FXLIGHT  1.0
+/* Off: every fixture emits the same amount of light, as it always has */
+#define RENDER_DEFAULT_LUMENS   false
 
 /* The 3D view "Scale" fields of a generic item start locked together,
    matching the previous hardcoded state of the QML lock button */
@@ -115,6 +118,7 @@ MonitorProperties::MonitorProperties()
     , m_ambientLightIntensity(RENDER_DEFAULT_AMBIENT)
     , m_smokeAmount(RENDER_DEFAULT_SMOKE)
     , m_fixtureLightIntensity(RENDER_DEFAULT_FXLIGHT)
+    , m_useFixtureLumens(RENDER_DEFAULT_LUMENS)
     , m_showFPS(false)
     , m_scaleLocked(SCALE_DEFAULT_LOCKED)
     , m_showLabels(false)
@@ -132,6 +136,7 @@ void MonitorProperties::reset()
     m_ambientLightIntensity = RENDER_DEFAULT_AMBIENT;
     m_smokeAmount = RENDER_DEFAULT_SMOKE;
     m_fixtureLightIntensity = RENDER_DEFAULT_FXLIGHT;
+    m_useFixtureLumens = RENDER_DEFAULT_LUMENS;
     m_showFPS = false;
     m_scaleLocked = SCALE_DEFAULT_LOCKED;
     m_fixtureItems.clear();
@@ -765,6 +770,8 @@ bool MonitorProperties::loadXML(QXmlStreamReader &root, const Doc *mainDocument)
                 setSmokeAmount(tAttrs.value(KXMLQLCMonitorRenderSmoke).toString().toDouble());
             if (tAttrs.hasAttribute(KXMLQLCMonitorRenderFxLight))
                 setFixtureLightIntensity(tAttrs.value(KXMLQLCMonitorRenderFxLight).toString().toDouble());
+            if (tAttrs.hasAttribute(KXMLQLCMonitorRenderLumens))
+                setUseFixtureLumens(tAttrs.value(KXMLQLCMonitorRenderLumens).toString().toInt() != 0);
             if (tAttrs.hasAttribute(KXMLQLCMonitorRenderShowFPS))
                 setShowFPS(tAttrs.value(KXMLQLCMonitorRenderShowFPS).toString().toInt() != 0);
             root.skipCurrentElement();
@@ -999,6 +1006,7 @@ bool MonitorProperties::saveXML(QXmlStreamWriter *doc, const Doc *mainDocument) 
     doc->writeAttribute(KXMLQLCMonitorRenderAmbient, QString::number(ambientLightIntensity()));
     doc->writeAttribute(KXMLQLCMonitorRenderSmoke, QString::number(smokeAmount()));
     doc->writeAttribute(KXMLQLCMonitorRenderFxLight, QString::number(fixtureLightIntensity()));
+    doc->writeAttribute(KXMLQLCMonitorRenderLumens, QString::number(useFixtureLumens() ? 1 : 0));
     doc->writeAttribute(KXMLQLCMonitorRenderShowFPS, QString::number(showFPS() ? 1 : 0));
     doc->writeEndElement();
 
