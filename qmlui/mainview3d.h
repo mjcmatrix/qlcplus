@@ -414,15 +414,15 @@ public:
      *  to be displayed in QML */
     QVariant genericItemsList() const;
 
-    void updateGenericItemPosition(quint32 itemID, QVector3D pos) const;
+    void updateGenericItemPosition(quint32 itemID, QVector3D pos);
     QVector3D genericItemsPosition() const;
     void setGenericItemsPosition(QVector3D pos);
 
-    void updateGenericItemRotation(quint32 itemID, QVector3D rot) const;
+    void updateGenericItemRotation(quint32 itemID, QVector3D rot);
     QVector3D genericItemsRotation() const;
     void setGenericItemsRotation(QVector3D rot);
 
-    void updateGenericItemScale(quint32 itemID, QVector3D scale) const;
+    void updateGenericItemScale(quint32 itemID, QVector3D scale);
     QVector3D genericItemsScale() const;
     void setGenericItemsScale(QVector3D scale);
 

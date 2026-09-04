@@ -2358,7 +2358,7 @@ QVariant MainView3D::genericItemsList() const
     return QVariant::fromValue(m_genericItemsList);
 }
 
-void MainView3D::updateGenericItemPosition(quint32 itemID, QVector3D pos) const
+void MainView3D::updateGenericItemPosition(quint32 itemID, QVector3D pos)
 {
     if (isEnabled() == false)
         return;
@@ -2367,6 +2367,10 @@ void MainView3D::updateGenericItemPosition(quint32 itemID, QVector3D pos) const
     Tardis::instance()->enqueueAction(Tardis::GenericItemSetPosition, itemID, QVariant(currPos), QVariant(pos));
 
     m_monProps->setItemPosition(itemID, pos);
+
+    // this is also where an undo/redo of a move lands, so the
+    // editable properties need to be told the value has changed
+    emit genericItemsPositionChanged();
 
     SceneItem *item = m_genericMap.value(itemID, nullptr);
     if (item == nullptr || item->m_rootTransform == nullptr)
@@ -2421,7 +2425,7 @@ void MainView3D::setGenericItemsPosition(QVector3D pos)
     emit genericItemsPositionChanged();
 }
 
-void MainView3D::updateGenericItemRotation(quint32 itemID, QVector3D rot) const
+void MainView3D::updateGenericItemRotation(quint32 itemID, QVector3D rot)
 {
     if (isEnabled() == false)
         return;
@@ -2430,6 +2434,11 @@ void MainView3D::updateGenericItemRotation(quint32 itemID, QVector3D rot) const
     Tardis::instance()->enqueueAction(Tardis::GenericItemSetRotation, itemID, QVariant(currRot), QVariant(rot));
 
     m_monProps->setItemRotation(itemID, rot);
+
+    // this is also where an undo/redo of a rotation lands, so the
+    // editable properties need to be told the value has changed
+    emit genericItemsRotationChanged();
+
     SceneItem *item = m_genericMap.value(itemID, nullptr);
     if (item == nullptr || item->m_rootTransform == nullptr)
         return;
@@ -2481,7 +2490,7 @@ void MainView3D::setGenericItemsRotation(QVector3D rot)
     emit genericItemsRotationChanged();
 }
 
-void MainView3D::updateGenericItemScale(quint32 itemID, QVector3D scale) const
+void MainView3D::updateGenericItemScale(quint32 itemID, QVector3D scale)
 {
     if (isEnabled() == false)
         return;
@@ -2490,6 +2499,11 @@ void MainView3D::updateGenericItemScale(quint32 itemID, QVector3D scale) const
     Tardis::instance()->enqueueAction(Tardis::GenericItemSetScale, itemID, QVariant(currScale), QVariant(scale));
 
     m_monProps->setItemScale(itemID, scale);
+
+    // this is also where an undo/redo of a resize lands, so the
+    // editable properties need to be told the value has changed
+    emit genericItemsScaleChanged();
+
     SceneItem *item = m_genericMap.value(itemID, nullptr);
     if (item == nullptr || item->m_rootTransform == nullptr)
         return;
