@@ -75,6 +75,8 @@ Entity
     property real cutoffAngle: (focusMinDegrees / 2) * (Math.PI / 180)
 
     /* **************** Rendering quality properties **************** */
+    /* See Fixture3DItem: a beam bar lights surfaces and draws its beams */
+    property bool useShading: View3D.renderQuality === MainView3D.LowQuality ? false : true
     property bool useScattering: View3D.renderQuality === MainView3D.LowQuality ? false : true
 
     /* Shadows are not optional for this renderer: spotlight_shading.frag bounds
