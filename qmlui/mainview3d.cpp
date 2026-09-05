@@ -3083,7 +3083,12 @@ qreal MainView3D::referenceCandela() const
     return m_referenceCandela;
 }
 
-qreal MainView3D::fixtureEmitterLumens(Fixture *fixture)
+/** Nominal output of an LED Bar (Pixels) whose definition declares no Lumens:
+ *  the median of the 19 definitions of that type in the fixture library that
+ *  do declare it. See fixtureEmitterLumens(). */
+#define NOMINAL_PIXEL_BAR_LUMENS 2160
+
+qreal MainView3D::fixtureEmitterLumens(Fixture *fixture, bool allowNominal)
 {
     if (fixture == nullptr)
         return 0;
@@ -3096,6 +3101,28 @@ qreal MainView3D::fixtureEmitterLumens(Fixture *fixture)
     // global <Physical> when the mode doesn't override it. There is no
     // per-head physical, so this is the output of the whole fixture.
     int lumens = mode->physical().bulbLumens();
+
+    // "Unknown" normally means "render at the reference level", i.e. as bright
+    // as the brightest emitter in the project. That is a safe default for a
+    // beam fixture, where the whole class sits within a stop or two of each
+    // other, but it is the worst possible one for a pixel bar: the type spans
+    // decorative chase battens of a few tens of lumens and blinders of tens of
+    // thousands, and only 19 of the 63 definitions of this type in the library
+    // declare the figure at all. Left at the reference, the 44 that do not
+    // would every one of them light a room like a blinder.
+    //
+    // So give an undeclared pixel bar a nominal output instead: the median of
+    // the ones that do declare it. It is a guess, but it is a guess drawn from
+    // the library rather than invented, it is bounded, and it fails in the
+    // direction a user can see and correct - too dim, add Lumens to the
+    // definition - rather than swamping the frame.
+    //
+    // PowerConsumption was measured as an alternative, since every definition
+    // of this type carries it: across the 19 that declare both, efficacy spans
+    // 0.4 to 351 lm/W, a spread of 3000 to 1, so it estimates nothing.
+    if (allowNominal && lumens <= 0 && fixture->type() == QLCFixtureDef::LEDBarPixels)
+        lumens = NOMINAL_PIXEL_BAR_LUMENS;
+
     if (lumens <= 0)
         return 0;
 
@@ -3121,9 +3148,9 @@ qreal MainView3D::beamSolidAngle(qreal fullAngleDegrees)
     return 2.0 * M_PI * (1.0 - qCos(qDegreesToRadians(fullAngleDegrees / 2.0)));
 }
 
-qreal MainView3D::fixtureEmitterCandela(Fixture *fixture)
+qreal MainView3D::fixtureEmitterCandela(Fixture *fixture, bool allowNominal)
 {
-    qreal lumens = fixtureEmitterLumens(fixture);
+    qreal lumens = fixtureEmitterLumens(fixture, allowNominal);
     if (lumens <= 0)
         return 0;
 
@@ -3150,7 +3177,14 @@ void MainView3D::updateReferenceCandela()
     qreal reference = 0;
 
     for (Fixture *fixture : m_doc->fixtures())
-        reference = qMax(reference, fixtureEmitterCandela(fixture));
+        // Only fixtures that actually declare their output set the reference.
+        // The nominal above is a stand in for missing data, and a stand in must
+        // never become the thing everything else is measured against: five of
+        // the library's pixel bars declare a 15 to 25 degree lens and no Lumens
+        // at all, and a nominal output squeezed into that solid angle comes out
+        // at tens of thousands of candela - enough to take over as the project
+        // reference and dim every real fixture in the rig around it.
+        reference = qMax(reference, fixtureEmitterCandela(fixture, false));
 
     if (reference == m_referenceCandela)
         return;
