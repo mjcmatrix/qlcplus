@@ -79,7 +79,23 @@ Entity
        definition that gives no lens angle still washes rather than spotlights. */
     property real focusMinDegrees: 120
     property real focusMaxDegrees: 120
-    property real distCutoff: 40.0
+
+    /* How far a cell's light is drawn. This is the one number that governs what
+       a bar costs to shade: the cone is a top hat drawn as real geometry, and
+       its bottom radius grows with the throw and with the tangent of the
+       aperture, so a 120 degree cell at 40 metres is a 69 metre disc that
+       covers most of the screen on its own. A single head fixture can afford
+       that; a bar pays it once per cell.
+
+       There is no physical distance at which the light stops - the inverse
+       square falloff is still well above one part in 255 at 40 metres - so
+       shortening it is a rendering trade and belongs on the quality dial rather
+       than being derived from the fixture. Medium gives up light beyond fifteen
+       metres, which is past the back wall of most rooms a batten is rigged in,
+       and gets a sharper shadow map into the bargain, since the light frustum
+       covers exactly this distance. High and Ultra keep the full throw. */
+    property real distCutoff:
+        View3D.renderQuality === MainView3D.MediumQuality ? 15.0 : 40.0
 
     /* Aperture the definition declares, as a full angle in degrees. By stage
        convention this is the BEAM angle: the full width at 50% of peak
@@ -224,6 +240,7 @@ Entity
                 "raymarchSteps": Qt.binding(function() { return fixtureEntity.raymarchSteps }),
                 "cutoffAngle": Qt.binding(function() { return fixtureEntity.cutoffAngle }),
                 "distCutoff": Qt.binding(function() { return fixtureEntity.distCutoff }),
+                "coneMesh": cellConeMesh,
                 "headLength": Qt.binding(function() { return fixtureEntity.headLength }),
                 "coneTopRadius": Qt.binding(function() { return fixtureEntity.coneTopRadius }),
                 "beamEdgeSoftness": Qt.binding(function() { return fixtureEntity.beamEdgeSoftness }),
@@ -259,9 +276,6 @@ Entity
 
     function setupScattering(sceneEntity)
     {
-        if (sceneEntity.coneMesh.length !== distCutoff)
-            sceneEntity.coneMesh.length = distCutoff
-
         for (var i = 0; i < headsList.length; i++)
             headsList[i].setupScattering(sceneEntity)
     }
@@ -361,6 +375,26 @@ Entity
     }
 
     ShutterAnimator { id: sAnimator }
+
+    /* The cells of this bar are drawn with their own cone rather than the one
+       the scene shares out, because their throw distance is not the 40 metres
+       every other item type assumes and the shared mesh carries that length for
+       everybody (see LightEntity.coneMesh). One low poly cone is shared by all
+       the cells of the bar, so this costs one extra mesh per fixture, not per
+       cell. The radii stay at 1: spotlight.vert scales them per emitter from
+       the coneTopRadius and coneBottomRadius uniforms. */
+    ConeMesh
+    {
+        id: cellConeMesh
+
+        length: fixtureEntity.distCutoff
+
+        bottomRadius: 1.0
+        topRadius: 1.0
+
+        rings: 2
+        slices: 60
+    }
 
     /* Main transform of the whole fixture item */
     property Transform transform: Transform { }
