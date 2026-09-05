@@ -63,6 +63,11 @@ Entity
     property real cutoffAngle: (focusMinDegrees / 2.0) * (Math.PI / 180.0)
 
     /* **************** Rendering quality properties **************** */
+    /* Whether this fixture lights the surfaces it is aimed at (useShading) and
+       whether it also draws a volumetric beam in the air (useScattering). Every
+       fixture that throws a beam does both; see PixelBar3DItem for one that
+       lights surfaces without drawing a beam. */
+    property bool useShading: View3D.renderQuality === MainView3D.LowQuality ? false : true
     property bool useScattering: View3D.renderQuality === MainView3D.LowQuality ? false : true
     property bool useShadows: View3D.renderQuality === MainView3D.LowQuality ? false : true
     property int raymarchSteps:

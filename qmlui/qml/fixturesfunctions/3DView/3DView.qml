@@ -228,11 +228,15 @@ Rectangle
                     console.log("Error loading component:", component.errorString())
             }
 
+            // This pass is what puts a fixture's light on a surface, so it is
+            // gated by useShading and NOT by useScattering: the two were the
+            // same flag until LED Bar (Pixels) needed to light the room without
+            // drawing a beam in the air.
             for (ic = 0; ic < fixtures.length; ++ic)
             {
                 fixtureItem = fixtures[ic]
 
-                if (fixtureItem.useScattering === false)
+                if (fixtureItem.useShading === false)
                     continue
 
                 for (iHead = 0; iHead < fixtureItem.headsNumber; iHead++)

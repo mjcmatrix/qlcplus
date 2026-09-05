@@ -777,10 +777,17 @@ void MainView3D::createFixtureItem(quint32 fxID, quint16 headIndex, quint16 link
     else if (fixture->type() == QLCFixtureDef::LEDBarPixels ||
              fixture->type() == QLCFixtureDef::Strobe)
     {
-        mesh->m_goboTexture = nullptr;
-        QUrl componentSrc = fixture->type() == QLCFixtureDef::LEDBarPixels ?
-                                QUrl("qrc:/PixelBar3DItem.qml") :
-                                QUrl("qrc:/Strobe3DItem.qml");
+        bool isPixelBar = fixture->type() == QLCFixtureDef::LEDBarPixels;
+
+        // A pixel bar lights the surfaces it is aimed at, so it runs the same
+        // spotlight shading pass as every other emitter, and that pass masks the
+        // light with the gobo texture: goboMask is sampled from goboTex in
+        // spotlight_shading.frag, so a cell left without one emits nothing at
+        // all. A strobe casts no light and needs no mask.
+        mesh->m_goboTexture = isPixelBar ? new GoboTextureImage(512, 512, openGobo) : nullptr;
+
+        QUrl componentSrc = isPixelBar ? QUrl("qrc:/PixelBar3DItem.qml")
+                                       : QUrl("qrc:/Strobe3DItem.qml");
 
         QQmlComponent *lbComp = new QQmlComponent(m_view->engine(), componentSrc);
         if (lbComp->isError())
@@ -790,6 +797,7 @@ void MainView3D::createFixtureItem(quint32 fxID, quint16 headIndex, quint16 link
         if (newItem == nullptr)
         {
             qDebug() << "Fixture 3D item creation failed !!";
+            delete mesh->m_goboTexture;
             delete mesh;
             m_createItemCount--;
             return;
@@ -1202,6 +1210,18 @@ void MainView3D::initializeFixture(quint32 itemID, QEntity *fxEntity, const QSce
         tiltDeg = phy.focusTiltMax() ? phy.focusTiltMax() : 270;
         focusMin = phy.lensDegreesMin() ? phy.lensDegreesMin() : 10;
         focusMax = phy.lensDegreesMax() ? phy.lensDegreesMax() : 30;
+
+        // A pixel bar is a wash device - battens and blinders of this type carry
+        // lenses of 40 degrees and up - so a definition that gives no lens angle
+        // should still wash rather than spotlight. The narrow fallback above
+        // describes a beam fixture and would light a stripe the width of one cell.
+        if (fixture->type() == QLCFixtureDef::LEDBarPixels)
+        {
+            if (phy.lensDegreesMin() == 0)
+                focusMin = 120;
+            if (phy.lensDegreesMax() == 0)
+                focusMax = 120;
+        }
     }
 
     qDebug() << "Initialize fixture" << fixture->id();

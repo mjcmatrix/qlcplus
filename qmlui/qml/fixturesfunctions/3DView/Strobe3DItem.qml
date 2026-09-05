@@ -39,6 +39,9 @@ Entity
     property size headsLayout: Qt.size(1, 1)
     property vector3d phySize: Qt.vector3d(1, 0.1, 0.1)
     property alias itemSource: eSceneLoader.source
+    /* A strobe is drawn as emissive geometry only, so it neither lights
+       surfaces nor draws a beam. See Fixture3DItem for what these gate. */
+    property bool useShading: false
     property bool useScattering: false
     property bool useShadows: false
     property real shutterValue: sAnimator.shutterValue
