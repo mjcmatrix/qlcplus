@@ -432,6 +432,15 @@ Entity
                 property Transform headTransform:
                     Transform
                     {
+                        /* Face the plane down its fixture's -Y, the way the light
+                           leaves. A PlaneMesh is a single quad whose normal points
+                           +Y, and Qt3D culls back faces by default, so an unrotated
+                           cell was drawn facing up into the housing and clipped away
+                           from every angle it could have been seen from. Turning it
+                           over also makes the normal it writes into the G buffer the
+                           direction the cell actually emits in. */
+                        rotationX: 180
+
                         translation: {
                             var row = Math.floor(index / cellColumns)
                             var column = index % cellColumns
