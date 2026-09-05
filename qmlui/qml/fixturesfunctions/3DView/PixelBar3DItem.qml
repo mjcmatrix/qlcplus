@@ -165,6 +165,21 @@ Entity
        cell is dark, so an unlit bar costs nothing. */
     property bool useShadows: View3D.renderQuality === MainView3D.LowQuality ? false : true
 
+    /* Resolution of each cell's shadow map. A single head fixture can afford
+       the 1024x1024 default; a bar renders the whole scene into one of these
+       per cell, so a project with sixty cells in it re-renders the scene sixty
+       times a frame into 240 MB of depth texture. Scale it with the quality
+       dial: a quarter of the resolution is a sixteenth of the depth traffic. */
+    property int cellShadowMapSize:
+    {
+        switch (View3D.renderQuality)
+        {
+            case MainView3D.MediumQuality: return 256
+            case MainView3D.HighQuality: return 512
+            default: return 1024
+        }
+    }
+
     /* This item never enters the scattering pass, so no ray marching is done
        for it. The property exists because LightEntity binds it into the
        "raymarchSteps" uniform regardless. */
@@ -241,6 +256,7 @@ Entity
                 "cutoffAngle": Qt.binding(function() { return fixtureEntity.cutoffAngle }),
                 "distCutoff": Qt.binding(function() { return fixtureEntity.distCutoff }),
                 "coneMesh": cellConeMesh,
+                "shadowMapSize": Qt.binding(function() { return fixtureEntity.cellShadowMapSize }),
                 "headLength": Qt.binding(function() { return fixtureEntity.headLength }),
                 "coneTopRadius": Qt.binding(function() { return fixtureEntity.coneTopRadius }),
                 "beamEdgeSoftness": Qt.binding(function() { return fixtureEntity.beamEdgeSoftness }),
