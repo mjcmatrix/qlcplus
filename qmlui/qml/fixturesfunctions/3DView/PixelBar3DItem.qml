@@ -423,14 +423,21 @@ Entity
             {
                 id: headDelegate
                 property real dimmerValue: 0
-                /* Brightness of the glowing patch on the housing, scaled by the
-                   same "Fixture light" gain and Lumens balance as the emitters
-                   below it. This is now the pixel the viewer sees rather than
-                   the fixture's whole light contribution, which the per cell
-                   LightEntity emitters carry. */
-                property real lightIntensity:
-                    dimmerValue * shutterValue * lumensScale *
-                    (View3D ? View3D.fixtureLightIntensity : 1.0)
+                /* Brightness of the lit patch on the housing: the LED array as
+                   the viewer sees it head on, which is a different quantity from
+                   the light the cell throws into the room.
+
+                   What the eye reads off a source it looks straight at is the
+                   source's luminance, and that is a property of the emitter
+                   alone: it does not fall off with distance and it does not
+                   depend on what else is rigged. So this deliberately carries
+                   neither lumensScale nor the "Fixture light" gain, both of
+                   which belong to radiated light and are applied to the per cell
+                   LightEntity emitters instead. Carrying them here scaled the lit
+                   face by the project wide candela ratio - 0.014 for a batten
+                   rigged alongside a narrow beam moving head - and a bar whose
+                   pixels are plainly on rendered as a dark grey box. */
+                property real lightIntensity: dimmerValue * shutterValue
                 property real headWidth: phySize.x / cellColumns
                 property real headHeight: phySize.z / cellRows
                 property color lightColor: Qt.rgba(0, 0, 0, 1)
