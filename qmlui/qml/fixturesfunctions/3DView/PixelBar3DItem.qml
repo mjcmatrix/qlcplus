@@ -67,7 +67,57 @@ Entity
     property real focusMinDegrees: 120
     property real focusMaxDegrees: 120
     property real distCutoff: 40.0
-    property real cutoffAngle: (focusMinDegrees / 2) * (Math.PI / 180)
+
+    /* Aperture the definition declares, as a full angle in degrees. By stage
+       convention this is the BEAM angle: the full width at 50% of peak
+       intensity, with the field angle - the width at 10% - roughly half again
+       as wide. The renderer's cone is a top hat, so taking the declared figure
+       as the cone edge draws the half power width at full power and then stops
+       dead, which is why a wash bar came out looking like a focused beam. */
+    property real beamDegrees: focusMinDegrees
+    readonly property real beamHalfAngle: (beamDegrees / 2) * (Math.PI / 180)
+
+    /* Ratio of field angle to beam angle for a wash optic. */
+    readonly property real fieldAngleRatio: 1.5
+
+    /* Widest cone this renderer draws well. getLightProjectionMatrix() builds a
+       perspective frustum from the cone half angle and the shadow map covers
+       exactly that frustum, so a very wide cone spreads 1024 texels over most of
+       a hemisphere and the beam starts failing its own shadow test. 60 degrees
+       is the widest aperture already in use, so it is known good: beyond it the
+       aperture is left alone and only the falloff below widens. */
+    readonly property real maxHalfAngle: 60 * (Math.PI / 180)
+
+    /* Draw the cone out to the field angle, so light reaches as far as it
+       really does, and let beamEdgeSoftness put the 50% point back on the
+       declared beam angle. */
+    readonly property real fieldHalfAngle:
+        Math.min(beamHalfAngle * fieldAngleRatio, maxHalfAngle)
+
+    property real cutoffAngle: fieldHalfAngle
+
+    /* An aperture this wide is not a projected beam at all. SMD pixel battens
+       publish the LED's viewing angle - the half power cone of a bare emitter,
+       typically 110 to 120 degrees - and such an emitter is essentially
+       Lambertian: it radiates across the hemisphere with a cosine falloff and
+       has no rim whatsoever. */
+    readonly property real viewingAngleThreshold: 90
+
+    /* Softness that puts the half power point back on the declared beam angle.
+       beamPenumbra() fades over a fraction of the cone RADIUS, so the crossover
+       is a ratio of tangents rather than of angles: solving
+       smoothstep(1 - soft, 1, ratio) = 0.5 gives soft = 2 - 2 * ratio. */
+    readonly property real beamEdgeSoftness:
+    {
+        if (beamHalfAngle <= 0)
+            return 0
+
+        if (beamDegrees >= viewingAngleThreshold)
+            return 1.0
+
+        var ratio = Math.tan(beamHalfAngle) / Math.tan(fieldHalfAngle)
+        return Math.max(0.0, Math.min(1.0, 2.0 - (2.0 * ratio)))
+    }
 
     /* **************** Rendering quality properties **************** */
     /* The whole point of this fixture type: it lights the surfaces it is aimed
@@ -162,6 +212,7 @@ Entity
                 "distCutoff": Qt.binding(function() { return fixtureEntity.distCutoff }),
                 "headLength": Qt.binding(function() { return fixtureEntity.headLength }),
                 "coneTopRadius": Qt.binding(function() { return fixtureEntity.coneTopRadius }),
+                "beamEdgeSoftness": Qt.binding(function() { return fixtureEntity.beamEdgeSoftness }),
                 "goboTexture": Qt.binding(function() { return fixtureEntity.goboTexture })
             });
 
@@ -187,7 +238,9 @@ Entity
                     "layout:", headsLayout.width + "x" + headsLayout.height,
                     "used as:", cellColumns + "x" + cellRows,
                     "| lens:", focusMinDegrees + "-" + focusMaxDegrees + " deg",
-                    "cone top/bottom:", coneTopRadius.toFixed(4) + "/" + coneBottomRadius.toFixed(2))
+                    "cone top/bottom:", coneTopRadius.toFixed(4) + "/" + coneBottomRadius.toFixed(2),
+                    "| field:", (fieldHalfAngle * 2 * 180 / Math.PI).toFixed(0) + " deg",
+                    "softness:", beamEdgeSoftness.toFixed(2))
     }
 
     function setupScattering(sceneEntity)
@@ -283,12 +336,14 @@ Entity
 
     // Same signature as Fixture3DItem: MainView3D calls this with degrees == true
     // when the fixture has a fixed zoom set in the monitor properties
+    // Zoom sets the BEAM angle; the cone aperture and the edge softness are
+    // derived from it above, so a zoom move keeps the two consistent.
     function setZoom(value, degrees)
     {
         if (degrees)
-            cutoffAngle = (value / 2) * (Math.PI / 180.0)
+            beamDegrees = value
         else
-            cutoffAngle = (((((focusMaxDegrees - focusMinDegrees) / 255.0) * value) + focusMinDegrees) / 2.0) * (Math.PI / 180.0)
+            beamDegrees = (((focusMaxDegrees - focusMinDegrees) / 255.0) * value) + focusMinDegrees
     }
 
     ShutterAnimator { id: sAnimator }
