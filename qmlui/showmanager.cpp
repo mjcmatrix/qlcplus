@@ -37,6 +37,7 @@
 #include "app.h"
 
 #define SETTINGS_SNAP_TO_ITEMS QStringLiteral("showmanager/snaptoitems")
+
 #define KXMLQLCShowManagerCurrentShow QStringLiteral("CurrentShow")
 #define KXMLQLCShowManagerTimeScale   QStringLiteral("TimeScale")
 
