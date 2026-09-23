@@ -138,6 +138,10 @@ signals:
      *  the actual deletion, like the Functions Manager toolbar does */
     void requestFunctionsDeletion();
 
+    /** Emitted when the user requested renaming the currently focused
+     *  Function/Folder (e.g. by pressing F2) */
+    void requestFunctionRename();
+
 public slots:
     /** Resets the data structures and update the currently enabled views */
     void resetContexts();

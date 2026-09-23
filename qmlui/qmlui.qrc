@@ -141,6 +141,7 @@
     <file alias="ShutterAnimator.qml">qml/fixturesfunctions/ShutterAnimator.qml</file>
     <file alias="FunctionManager.qml">qml/fixturesfunctions/FunctionManager.qml</file>
     <file alias="AddFunctionMenu.qml">qml/fixturesfunctions/AddFunctionMenu.qml</file>
+    <file alias="AddContainerMenu.qml">qml/fixturesfunctions/AddContainerMenu.qml</file>
     <file alias="EditorTopBar.qml">qml/fixturesfunctions/EditorTopBar.qml</file>
     <file alias="AudioEditor.qml">qml/fixturesfunctions/AudioEditor.qml</file>
     <file alias="VideoEditor.qml">qml/fixturesfunctions/VideoEditor.qml</file>

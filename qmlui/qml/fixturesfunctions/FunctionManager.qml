@@ -63,6 +63,66 @@ Rectangle
             functionManager.setFunctionFilter(fType, false);
     }
 
+    /* Recursively look for the currently selected item's delegate in the
+     * function tree's visual item hierarchy (a chain of Loaders, unwrapped
+     * to the item they instantiated) */
+    function findSelectedDelegate(rootItem)
+    {
+        if (!rootItem || !rootItem.children)
+            return null
+
+        for (var i = 0; i < rootItem.children.length; i++)
+        {
+            var child = rootItem.children[i]
+            var target = child
+
+            if (child.hasOwnProperty("item") && child.item)
+                target = child.item
+
+            if (target && target.hasOwnProperty("isSelected") && target.isSelected === true)
+                return target
+
+            var found = findSelectedDelegate(target)
+            if (found)
+                return found
+        }
+
+        return null
+    }
+
+    /* The functions tree is rebuilt from scratch (cleared, then repopulated)
+     * after some actions (e.g. cloning, filtering), which can leave the
+     * viewport scrolled away from the current selection. Bring the selected
+     * item back into view, keeping it where it already is if it is still
+     * visible, or centering it otherwise. */
+    function ensureSelectionVisible()
+    {
+        if (!functionsListView.contentItem)
+            return
+
+        var target = findSelectedDelegate(functionsListView.contentItem)
+        if (!target)
+            return
+
+        var pos = target.mapToItem(functionsListView.contentItem, 0, 0)
+        var viewportHeight = functionsListView.height
+        var itemTop = pos.y
+        var itemBottom = pos.y + target.height
+
+        if (itemTop >= functionsListView.contentY && itemBottom <= functionsListView.contentY + viewportHeight)
+            return
+
+        var maxContentY = Math.max(functionsListView.contentHeight - viewportHeight, 0)
+        var centered = itemTop - (viewportHeight - target.height) / 2
+        functionsListView.contentY = Math.min(Math.max(centered, 0), maxContentY)
+    }
+
+    Connections
+    {
+        target: functionManager
+        function onFunctionsListChanged() { Qt.callLater(ensureSelectionVisible) }
+    }
+
     ColumnLayout
     {
       anchors.fill: parent
