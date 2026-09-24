@@ -82,9 +82,10 @@ public:
      *  every emitter of the head at full has a luminance of 1, since that is
      *  the state a definition's "Lumens" describes: an RGB head at full white
      *  has a $gain of 1, as before, while RGB alone on an RGBW head comes out
-     *  at about half of it. A head that makes no colour of its own emits the
-     *  shade of white its bulb's colour temperature gives, at a luminance of 1,
-     *  and so does the white emitter of an RGBW head. */
+     *  at about half of it. The white emitter of an RGBW head takes the
+     *  shade of white its bulb's colour temperature gives, at a luminance of 1.
+     *  A head that makes no colour of its own is a single emitter with nothing
+     *  to add up, so it comes back as headColor() gives it, with a $gain of 1. */
     static QColor headEmission(Fixture *fixture, int headIndex, qreal &gain);
 
     /** Chromaticity of a black body at $kelvin, as a linear RGB colour

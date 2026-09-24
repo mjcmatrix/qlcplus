@@ -501,14 +501,14 @@ QColor FixtureUtils::headEmission(Fixture *fixture, int headIndex, qreal &gain)
         colorFound = true;
     }
 
-    // Nothing on this head makes a colour, so it is a plain white emitter,
-    // always emitting all it can: its dimmer is applied by the caller
+    // Nothing on this head makes a colour, so it is a single white emitter,
+    // always emitting all it can: its dimmer is applied by the caller. With
+    // nothing to add up there is nothing to rescale either, so it renders as
+    // headColor() gives it: the bulb's tint at full, gain 1
     if (colorFound == false)
     {
-        r = whiteR;
-        g = whiteG;
-        b = whiteB;
-        fullLuma = 1.0;
+        gain = 1.0;
+        return tint;
     }
 
     qreal peak = qMax(r, qMax(g, b));
@@ -520,13 +520,15 @@ QColor FixtureUtils::headEmission(Fixture *fixture, int headIndex, qreal &gain)
     return QColor::fromRgbF(r / peak, g / peak, b / peak);
 }
 
-QColor FixtureUtils::colourTemperatureTint(int kelvin)
+/* Linear sRGB colour of a black body at $kelvin, at unit luminance. False
+   outside the range the approximation is defined over */
+static bool blackBodyColour(int kelvin, qreal &r, qreal &g, qreal &b)
 {
     // "Unknown" in a fixture definition, and anything the approximation below
     // is not defined over. Both mean "no tint", which is what an invalid
     // colour tells the caller.
     if (kelvin < 1667 || kelvin > 25000)
-        return QColor();
+        return false;
 
     // Chromaticity of the Planckian locus, by Kim et al's cubic approximation.
     qreal t = kelvin;
@@ -551,7 +553,7 @@ QColor FixtureUtils::colourTemperatureTint(int kelvin)
         y = 3.0817580 * x3 - 5.87338670 * x2 + 3.75112997 * x - 0.37001483;
 
     if (y <= 0)
-        return QColor();
+        return false;
 
     // xyY to XYZ at unit luminance, then XYZ to linear sRGB. The rest of the
     // renderer treats a colour's components as linear - an RGB fixture's DMX
@@ -561,13 +563,42 @@ QColor FixtureUtils::colourTemperatureTint(int kelvin)
     qreal Y = 1.0;
     qreal Z = (1.0 - x - y) / y;
 
-    qreal r =  3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z;
-    qreal g = -0.9692660 * X + 1.8760108 * Y + 0.0415560 * Z;
-    qreal b =  0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z;
+    r =  3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z;
+    g = -0.9692660 * X + 1.8760108 * Y + 0.0415560 * Z;
+    b =  0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z;
 
     r = qMax(r, 0.0);
     g = qMax(g, 0.0);
     b = qMax(b, 0.0);
+
+    return true;
+}
+
+/** Colour temperature the tints are adapted to: D50, the white point of
+ *  standard viewing conditions. See colourTemperatureTint() */
+#define ADAPTED_WHITE_KELVIN 5000
+
+QColor FixtureUtils::colourTemperatureTint(int kelvin)
+{
+    qreal r, g, b;
+    if (blackBodyColour(kelvin, r, g, b) == false)
+        return QColor();
+
+    // Chromatic adaptation, von Kries style: scale each channel by the
+    // colour of the white the viewer is adapted to. Rendered as absolute
+    // chromaticity, a tungsten lamp comes out orange, which is not what the
+    // eye in the room - or a camera, once it has white balanced - makes of
+    // it: it adapts to the light around it, and a 3200 K par reads as a warm
+    // white. Adapting to D50 keeps it warm, keeps a daylight lamp slightly
+    // cool, and leaves the light of an RGB fixture alone, which is not tinted
+    // at all.
+    qreal wr, wg, wb;
+    if (blackBodyColour(ADAPTED_WHITE_KELVIN, wr, wg, wb))
+    {
+        r /= wr;
+        g /= wg;
+        b /= wb;
+    }
 
     // Normalise on the largest component rather than on luminance. This is a
     // tint that gets multiplied into a white emitter, and how much light that
