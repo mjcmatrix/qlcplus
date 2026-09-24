@@ -55,14 +55,18 @@ Entity
        "Lumens" physical property of its mode spread over the solid angle of the
        beam at the widest the lens opens. 0 when the definition has no data */
     property real bulbCandela: 0
+    /* bulbCandela, or when the definition has no data the median output of
+       the fixtures in the project that do (see MainView3D::fallbackCandela) */
+    property real effectiveCandela:
+        bulbCandela > 0 ? bulbCandela : (View3D ? View3D.fallbackCandela : 0)
     /* Relative output of this fixture: its intensity against the brightest
        emitter in the project, so the reference fixture stays at the brightness
        it has always rendered at and everything else falls in around it. 1.0
-       (unscaled) when the "Lumens" setting is off, when this definition has no
-       lumens, or when no fixture in the project has any. */
+       (unscaled) when the "Lumens" setting is off, or when no fixture in the
+       project declares any lumens. */
     property real lumensScale:
-        (View3D && View3D.useFixtureLumens && bulbCandela > 0 && View3D.referenceCandela > 0) ?
-            bulbCandela / View3D.referenceCandela : 1.0
+        (View3D && View3D.useFixtureLumens && effectiveCandela > 0 && View3D.referenceCandela > 0) ?
+            effectiveCandela / View3D.referenceCandela : 1.0
 
 
     onItemIDChanged:

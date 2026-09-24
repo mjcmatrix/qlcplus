@@ -119,6 +119,7 @@ class MainView3D final : public PreviewContext
     Q_PROPERTY(float fixtureLightIntensity READ fixtureLightIntensity WRITE setFixtureLightIntensity NOTIFY fixtureLightIntensityChanged)
     Q_PROPERTY(bool useFixtureLumens READ useFixtureLumens WRITE setUseFixtureLumens NOTIFY useFixtureLumensChanged)
     Q_PROPERTY(qreal referenceCandela READ referenceCandela NOTIFY referenceCandelaChanged)
+    Q_PROPERTY(qreal fallbackCandela READ fallbackCandela NOTIFY fallbackCandelaChanged)
     Q_PROPERTY(qreal referenceThrow READ referenceThrow NOTIFY referenceThrowChanged)
 
     Q_PROPERTY(bool frameCountEnabled READ frameCountEnabled WRITE setFrameCountEnabled NOTIFY frameCountEnabledChanged)
@@ -619,6 +620,12 @@ public:
      *  a no-op. */
     qreal referenceCandela() const;
 
+    /** Luminous intensity given to an emitter whose definition declares no
+     *  output (and gets no nominal one, see fixtureEmitterLumens()): the median
+     *  over the fixtures in the project that do declare it. 0 when none does,
+     *  which leaves such an emitter unscaled. */
+    qreal fallbackCandela() const;
+
     /** Distance, in metres, at which fixture light lands unscaled once the
      *  inverse square falloff is applied: the mean height above the floor of
      *  the fixtures placed in the project, which is what tells a club rig from
@@ -654,9 +661,10 @@ protected:
      *  when the 3D view becomes visible. Does not mark the project modified. */
     void applyRenderSettings();
 
-    /** Recompute referenceCandela() from the fixtures currently in the project
-     *  and notify the QML side if it moved. Called whenever the set of
-     *  fixtures changes, since the reference is the maximum over all of them. */
+    /** Recompute referenceCandela() and fallbackCandela() from the fixtures
+     *  currently in the project and notify the QML side if they moved. Called
+     *  whenever the set of fixtures changes, since both are taken over all of
+     *  them. */
     void updateReferenceCandela();
 
     /** Recompute referenceThrow() from the positions of the fixtures placed in
@@ -682,6 +690,7 @@ signals:
     void fixtureLightIntensityChanged(float fixtureLightIntensity);
     void useFixtureLumensChanged(bool useFixtureLumens);
     void referenceCandelaChanged(qreal referenceCandela);
+    void fallbackCandelaChanged(qreal fallbackCandela);
     void referenceThrowChanged(qreal referenceThrow);
 
 private:
@@ -698,6 +707,10 @@ private:
 
     /** Cached maximum of fixtureEmitterCandela() over the project's fixtures */
     qreal m_referenceCandela;
+
+    /** Cached median of fixtureEmitterCandela() over the project's fixtures
+     *  that declare their output */
+    qreal m_fallbackCandela;
 
     /** Cached mean height above the floor, in metres, of the project's placed
      *  fixture items */

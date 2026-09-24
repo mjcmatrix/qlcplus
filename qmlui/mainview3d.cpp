@@ -32,6 +32,7 @@
 #include <QXmlStreamReader>
 #include <QRegularExpression>
 #include <QtMath>
+#include <algorithm>
 
 #include <Qt3DCore/QTransform>
 #include <Qt3DCore/QNode>
@@ -103,6 +104,7 @@ MainView3D::MainView3D(QQuickView *view, Doc *doc, QObject *parent)
     , m_markerEntity(nullptr)
     , m_stageEntity(nullptr)
     , m_referenceCandela(0)
+    , m_fallbackCandela(0)
     , m_referenceThrow(0)
 {
     setContextResource("qrc:/3DView.qml");
@@ -3218,6 +3220,11 @@ qreal MainView3D::referenceCandela() const
     return m_referenceCandela;
 }
 
+qreal MainView3D::fallbackCandela() const
+{
+    return m_fallbackCandela;
+}
+
 /** Nominal output of an LED Bar (Pixels) whose definition declares no Lumens:
  *  the median of the 19 definitions of that type in the fixture library that
  *  do declare it. See fixtureEmitterLumens(). */
@@ -3310,8 +3317,10 @@ qreal MainView3D::fixtureEmitterCandela(Fixture *fixture, bool allowNominal)
 void MainView3D::updateReferenceCandela()
 {
     qreal reference = 0;
+    QList<qreal> declared;
 
     for (Fixture *fixture : m_doc->fixtures())
+    {
         // Only fixtures that actually declare their output set the reference.
         // The nominal above is a stand in for missing data, and a stand in must
         // never become the thing everything else is measured against: five of
@@ -3319,7 +3328,34 @@ void MainView3D::updateReferenceCandela()
         // at all, and a nominal output squeezed into that solid angle comes out
         // at tens of thousands of candela - enough to take over as the project
         // reference and dim every real fixture in the rig around it.
-        reference = qMax(reference, fixtureEmitterCandela(fixture, false));
+        qreal candela = fixtureEmitterCandela(fixture, false);
+        if (candela <= 0)
+            continue;
+
+        reference = qMax(reference, candela);
+        declared.append(candela);
+    }
+
+    // A fixture that declares nothing used to render at the reference, i.e.
+    // as bright as the brightest emitter in the rig. In a rig that mixes a
+    // few high output pars with smaller fixtures that is a long way from
+    // typical, so give it the middle of the rig instead: the median of what
+    // the declared fixtures put out. Taken per fixture, so a type the rig
+    // carries many of weighs in accordingly.
+    qreal fallback = 0;
+    if (declared.isEmpty() == false)
+    {
+        std::sort(declared.begin(), declared.end());
+        int mid = declared.count() / 2;
+        fallback = declared.count() % 2 ? declared.at(mid) :
+                                          (declared.at(mid - 1) + declared.at(mid)) / 2.0;
+    }
+
+    if (fallback != m_fallbackCandela)
+    {
+        m_fallbackCandela = fallback;
+        emit fallbackCandelaChanged(m_fallbackCandela);
+    }
 
     if (reference == m_referenceCandela)
         return;
