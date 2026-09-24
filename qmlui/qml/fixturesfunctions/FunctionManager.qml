@@ -19,7 +19,6 @@
 
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Window
 import QtQuick.Controls
 
 import org.qlcplus.classes 1.0
@@ -62,77 +61,6 @@ Rectangle
             functionManager.setFunctionFilter(fType, true);
         else
             functionManager.setFunctionFilter(fType, false);
-    }
-
-    /* The functions tree is rebuilt from scratch (cleared, then repopulated)
-     * after some actions (e.g. cloning, filtering), which can leave the
-     * viewport scrolled away from the current selection. Bring the selection
-     * back into view: leave the view alone if the whole selection is already
-     * visible, otherwise center the span it covers, or if that span is
-     * taller than the viewport, anchor to its top.
-     * Right after a rebuild, the delegates far from the viewport don't exist
-     * and the nested ones are not laid out yet, so positions are computed
-     * from the tree model instead, where every displayed row (folder header
-     * or Function) is exactly one list item high. */
-    property var pendingSelectionRows: null
-
-    function ensureSelectionVisible()
-    {
-        // [first level index, its starting row, first selected row,
-        //  last selected row, total rows]
-        var rows = functionManager.functionsList.selectionRows()
-        if (rows.length === 0)
-            return
-
-        var rowHeight = UISettings.listItemHeight
-        var viewportY = functionsListView.contentY - functionsListView.originY
-
-        if (rows[2] * rowHeight >= viewportY &&
-            (rows[3] + 1) * rowHeight <= viewportY + functionsListView.height)
-            return
-
-        // Bring the first level item holding the selection to the top of the
-        // view. This creates its delegate, whose nested children are laid out
-        // on the next frame together with the items around it, after which
-        // centerSelection() can place the selection exactly.
-        functionsListView.positionViewAtIndex(rows[0], ListView.Beginning)
-        pendingSelectionRows = rows
-    }
-
-    function centerSelection()
-    {
-        var rows = pendingSelectionRows
-        pendingSelectionRows = null
-
-        var topItem = functionsListView.itemAtIndex(rows[0])
-        if (!topItem)
-            return
-
-        var rowHeight = UISettings.listItemHeight
-        var viewportHeight = functionsListView.height
-        var spanTop = rows[2] * rowHeight
-        var spanHeight = (rows[3] + 1) * rowHeight - spanTop
-        var target = spanHeight <= viewportHeight ? spanTop - (viewportHeight - spanHeight) / 2 : spanTop
-        target = Math.min(Math.max(target, 0), Math.max(rows[4] * rowHeight - viewportHeight, 0))
-
-        // map the model row position onto the laid out first level item
-        functionsListView.contentY = topItem.y + target - rows[1] * rowHeight
-    }
-
-    // Synchronization follows the polish pass that lays the items out, and
-    // a frame being synchronized can't already be in progress while
-    // ensureSelectionVisible() runs on the GUI thread
-    Connections
-    {
-        target: fmContainer.Window.window
-        enabled: fmContainer.pendingSelectionRows !== null
-        function onAfterSynchronizing() { fmContainer.centerSelection() }
-    }
-
-    Connections
-    {
-        target: functionManager
-        function onFunctionsListChanged() { Qt.callLater(ensureSelectionVisible) }
     }
 
     ColumnLayout

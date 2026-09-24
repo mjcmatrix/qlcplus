@@ -77,57 +77,6 @@ void TreeModel::setCheckable(bool enable)
     m_checkable = enable;
 }
 
-QVariantList TreeModel::selectionRows() const
-{
-    int row = 0, first = -1, last = -1;
-    int topIndex = -1, topStart = -1;
-
-    for (int i = 0; i < m_items.count(); i++)
-    {
-        int itemStart = row;
-        TreeModelItem *item = m_items.at(i);
-
-        if (item->flags() & Selected)
-        {
-            if (first < 0)
-                first = row;
-            last = row;
-        }
-        row++;
-
-        if (item->hasChildren() && (item->flags() & Expanded))
-            item->children()->findSelectedRows(row, first, last);
-
-        if (first >= 0 && topIndex < 0)
-        {
-            topIndex = i;
-            topStart = itemStart;
-        }
-    }
-
-    if (first < 0)
-        return QVariantList();
-
-    return QVariantList() << topIndex << topStart << first << last << row;
-}
-
-void TreeModel::findSelectedRows(int &row, int &first, int &last) const
-{
-    for (TreeModelItem *item : m_items)
-    {
-        if (item->flags() & Selected)
-        {
-            if (first < 0)
-                first = row;
-            last = row;
-        }
-        row++;
-
-        if (item->hasChildren() && (item->flags() & Expanded))
-            item->children()->findSelectedRows(row, first, last);
-    }
-}
-
 void TreeModel::setSingleSelection(TreeModelItem *item)
 {
     //bool parentSignalSent = false;
