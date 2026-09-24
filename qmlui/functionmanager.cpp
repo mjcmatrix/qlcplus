@@ -1197,8 +1197,29 @@ bool FunctionManager::cloneFunctions(QString customName)
         }
     }
 
-    updateFunctionsTree();
+    /* The clones were added to the tree when they were added to the Doc,
+     * so just move the selection onto them. Rebuilding the whole tree
+     * would reset the view and lose its scroll position */
+    m_functionTree->setSingleSelection(nullptr);
+    for (QVariant &fidVar : m_selectedIDList)
+    {
+        Function *f = m_doc->function(fidVar.toUInt());
+        if (f == nullptr)
+            continue;
 
+        QString fPath = f->path(true).replace("/", TreeModel::separator());
+        TreeModel *model = m_functionTree;
+        if (fPath.isEmpty() == false)
+        {
+            TreeModelItem *node = m_functionTree->itemAtPath(fPath);
+            if (node == nullptr || node->hasChildren() == false)
+                continue;
+            model = node->children();
+        }
+        model->setItemRoleData(model->itemAtPath(f->name()), 2, TreeModel::IsSelectedRole);
+    }
+
+    emitFunctionCounts();
     emit selectedFolderCountChanged(0);
     emit selectedFunctionCountChanged(m_selectedIDList.count());
 
@@ -1983,6 +2004,13 @@ void FunctionManager::updateFunctionsTree()
 
     //m_functionTree->printTree(); // enable for debug purposes
 
+    emitFunctionCounts();
+
+    emit functionsListChanged();
+}
+
+void FunctionManager::emitFunctionCounts()
+{
     emit sceneCountChanged();
     emit chaserCountChanged();
     emit sequenceCountChanged();
@@ -1993,8 +2021,6 @@ void FunctionManager::updateFunctionsTree()
     emit showCountChanged();
     emit audioCountChanged();
     emit videoCountChanged();
-
-    emit functionsListChanged();
 }
 
 void FunctionManager::slotDocLoaded()

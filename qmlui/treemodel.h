@@ -113,6 +113,13 @@ public:
     /** Get the list of first level items of this tree. This doesn't include children. */
     QList<TreeModelItem *> items() const;
 
+    /** Locate the visible selected items, counting in displayed rows (a
+     *  folder's children count only while it is expanded). Returns
+     *  [first level row holding the first selected item, displayed row where
+     *  that first level item starts, first selected row, last selected row,
+     *  total displayed rows], or an empty list if no visible item is selected */
+    Q_INVOKABLE QVariantList selectionRows() const;
+
     /** Set columns data on a specific item with the provided $path */
     void setPathData(QString path, QVariantList data);
 
@@ -141,6 +148,7 @@ protected:
     QHash<int, QByteArray> roleNames() const override;
     int getItemInsertIndex(const QString& label, int flags = 0) const;
     int getNodeInsertIndex(const QString& label) const;
+    void findSelectedRows(int &row, int &first, int &last) const;
 
 protected:
     QStringList m_roles;

@@ -234,6 +234,7 @@ public:
 protected:
     quint32 addFunctiontoDoc(Function *func, QString name, bool select);
     void addFunctionTreeItem(Function *func);
+    void emitFunctionCounts();
     void clearTree();
     void moveFunction(quint32 fID, QString newPath);
     void storeExpandedPaths();
