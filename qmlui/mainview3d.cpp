@@ -1554,8 +1554,19 @@ void MainView3D::updateFixtureItem(Fixture *fixture, quint16 headIndex, quint16 
 
         // The 3D view renders the light this head actually casts, so a white
         // emitter is tinted by the colour temperature its definition declares
-        // rather than being rendered as pure white.
-        color = FixtureUtils::headColor(fixture, headIdx, true);
+        // rather than being rendered as pure white. With the Lumens setting on,
+        // the emitters of the head are added up rather than blended, so how
+        // much light the head makes follows which of them are lit.
+        if (useFixtureLumens())
+        {
+            qreal emissionGain = 0;
+            color = FixtureUtils::headEmission(fixture, headIdx, emissionGain);
+            intensityValue *= emissionGain;
+        }
+        else
+        {
+            color = FixtureUtils::headColor(fixture, headIdx, true);
+        }
 
         if (singleBeamMesh)
         {
@@ -3213,6 +3224,12 @@ void MainView3D::setUseFixtureLumens(bool use)
     m_monProps->setUseFixtureLumens(use);
     m_doc->setModified();
     emit useFixtureLumensChanged(use);
+
+    // the setting changes how a head's emitters are turned into light (see
+    // updateFixtureItem), so every fixture has to be worked out again
+    QByteArray all;
+    for (Fixture *fixture : m_doc->fixtures())
+        updateFixture(fixture, all);
 }
 
 qreal MainView3D::referenceCandela() const

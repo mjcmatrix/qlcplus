@@ -72,6 +72,21 @@ public:
     static QColor headColor(Fixture *fixture, int headIndex = 0,
                             bool useBulbTemperature = false);
 
+    /** Return the light the head with $headIndex of $fixture emits, for
+     *  rendering it photometrically: the hue as the returned colour,
+     *  normalised so its largest component is full, and the amount in $gain.
+     *
+     *  Unlike headColor(), which blends the emitters of a head into a colour
+     *  and so renders an RGBW head at full the same as its RGB alone, this
+     *  adds up what every emitter puts out. The whole is then scaled so that
+     *  every emitter of the head at full has a luminance of 1, since that is
+     *  the state a definition's "Lumens" describes: an RGB head at full white
+     *  has a $gain of 1, as before, while RGB alone on an RGBW head comes out
+     *  at about half of it. A head that makes no colour of its own emits the
+     *  shade of white its bulb's colour temperature gives, at a luminance of 1,
+     *  and so does the white emitter of an RGBW head. */
+    static QColor headEmission(Fixture *fixture, int headIndex, qreal &gain);
+
     /** Chromaticity of a black body at $kelvin, as a linear RGB colour
      *  normalised so its largest component is full: a tint to multiply a
      *  white emitter by, which changes its colour without changing how
