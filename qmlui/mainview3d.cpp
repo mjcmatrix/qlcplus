@@ -922,6 +922,10 @@ void MainView3D::createFixtureItem(quint32 fxID, quint16 headIndex, quint16 link
 
 void MainView3D::setFixtureFlags(quint32 itemID, quint32 flags)
 {
+    // hiding or showing a fixture takes it out of, or puts it back into, the
+    // rig whose scale the reference throw measures
+    updateReferenceThrow();
+
     SceneItem *meshRef = m_entitiesMap.value(itemID, nullptr);
     if (meshRef == nullptr)
         return;
@@ -3345,6 +3349,12 @@ void MainView3D::updateReferenceThrow()
         {
             quint16 headIndex = m_monProps->fixtureHeadIndex(subID);
             quint16 linkedIndex = m_monProps->fixtureLinkedIndex(subID);
+
+            // A hidden item casts no light, so it is not part of the rig either.
+            // Projects park unused fixtures hidden at the origin, and counting
+            // them drags the reference down towards the floor.
+            if (m_monProps->fixtureFlags(fixture->id(), headIndex, linkedIndex) & MonitorProperties::HiddenFlag)
+                continue;
 
             // Positions are stored in millimetres, measured up from the floor,
             // which is where the shader's world units start too.
