@@ -49,6 +49,7 @@ struct PreviewItem
     QString m_resource;         ///< Generic: source file
     QColor m_color;             ///< Generic: item color, Fixture: gel color
     int m_zoom = 0;             ///< Fixture: fixed zoom in degrees
+    qreal m_outputTrim = 1.0;   ///< Fixture: 3D view light output multiplier
     quint32 m_flags = 0;        ///< Item flags as specified in the ItemsFlags enum
 };
 
@@ -264,6 +265,11 @@ public:
     /** Get/Set the fixed zoom degrees used to render a Fixture with with the given $fid, $head and $linked index */
     void setFixtureFixedZoom(quint32 fid, quint16 head, quint16 linked, int degrees);
     int fixtureFixedZoom(quint32 fid, quint16 head, quint16 linked) const;
+
+    /** Get/Set the multiplier applied to the light the 3D view renders a Fixture
+     *  with, with the given $fid, $head and $linked index. 1.0 is unchanged */
+    void setFixtureOutputTrim(quint32 fid, quint16 head, quint16 linked, qreal trim);
+    qreal fixtureOutputTrim(quint32 fid, quint16 head, quint16 linked) const;
 
     /** Get/Set the name of a Fixture with with the given $fid, $head and $linked index */
     void setFixtureName(quint32 fid, quint16 head, quint16 linked, QString name);

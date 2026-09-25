@@ -81,6 +81,7 @@
 
 #define KXMLQLCMonitorFixtureGelColor   QStringLiteral("GelColor")
 #define KXMLQLCMonitorFixtureFixedZoom  QStringLiteral("FixedZoom")
+#define KXMLQLCMonitorFixtureOutputTrim QStringLiteral("OutputTrim")
 
 #define KXMLQLCMonitorFixtureHiddenFlag     QStringLiteral("Hidden")
 #define KXMLQLCMonitorFixtureInvPanFlag     QStringLiteral("InvertedPan")
@@ -374,6 +375,32 @@ int MonitorProperties::fixtureFixedZoom(quint32 fid, quint16 head, quint16 linke
     {
         quint32 subID = fixtureSubID(head, linked);
         return m_fixtureItems[fid].m_subItems[subID].m_zoom;
+    }
+}
+
+void MonitorProperties::setFixtureOutputTrim(quint32 fid, quint16 head, quint16 linked, qreal trim)
+{
+    if (head == 0 && linked == 0)
+    {
+        m_fixtureItems[fid].m_baseItem.m_outputTrim = trim;
+    }
+    else
+    {
+        quint32 subID = fixtureSubID(head, linked);
+        m_fixtureItems[fid].m_subItems[subID].m_outputTrim = trim;
+    }
+}
+
+qreal MonitorProperties::fixtureOutputTrim(quint32 fid, quint16 head, quint16 linked) const
+{
+    if (head == 0 && linked == 0)
+    {
+        return m_fixtureItems[fid].m_baseItem.m_outputTrim;
+    }
+    else
+    {
+        quint32 subID = fixtureSubID(head, linked);
+        return m_fixtureItems[fid].m_subItems[subID].m_outputTrim;
     }
 }
 
@@ -851,6 +878,9 @@ bool MonitorProperties::loadXML(QXmlStreamReader &root, const Doc *mainDocument)
             if (tAttrs.hasAttribute(KXMLQLCMonitorFixtureFixedZoom))
                 item.m_zoom = tAttrs.value(KXMLQLCMonitorFixtureFixedZoom).toString().toInt();
 
+            if (tAttrs.hasAttribute(KXMLQLCMonitorFixtureOutputTrim))
+                item.m_outputTrim = tAttrs.value(KXMLQLCMonitorFixtureOutputTrim).toString().toDouble();
+
             if (tAttrs.hasAttribute(KXMLQLCMonitorFixtureHiddenFlag))
                 item.m_flags |= HiddenFlag;
             if (tAttrs.hasAttribute(KXMLQLCMonitorFixtureInvPanFlag))
@@ -1081,6 +1111,10 @@ bool MonitorProperties::saveXML(QXmlStreamWriter *doc, const Doc *mainDocument) 
 
             if (item.m_zoom > 0)
                 doc->writeAttribute(KXMLQLCMonitorFixtureFixedZoom, QString::number(item.m_zoom));
+
+            // written only when set, so projects that don't use it are unchanged
+            if (item.m_outputTrim != 1.0)
+                doc->writeAttribute(KXMLQLCMonitorFixtureOutputTrim, QString::number(item.m_outputTrim));
 
             doc->writeEndElement();
         }

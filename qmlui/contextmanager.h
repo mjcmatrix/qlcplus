@@ -51,6 +51,7 @@ class ContextManager final : public QObject
     Q_PROPERTY(int selectedDimmersCount READ selectedDimmersCount NOTIFY selectedDimmersCountChanged)
     Q_PROPERTY(QVector3D fixturesPosition READ fixturesPosition WRITE setFixturesPosition NOTIFY fixturesPositionChanged)
     Q_PROPERTY(QVector3D fixturesRotation READ fixturesRotation WRITE setFixturesRotation NOTIFY fixturesRotationChanged)
+    Q_PROPERTY(qreal fixturesOutputTrim READ fixturesOutputTrim WRITE setFixturesOutputTrim NOTIFY fixturesOutputTrimChanged)
     Q_PROPERTY(int dumpValuesCount READ dumpValuesCount NOTIFY dumpValuesCountChanged)
     Q_PROPERTY(quint32 dumpChannelMask READ dumpChannelMask NOTIFY dumpChannelMaskChanged)
     Q_PROPERTY(bool multipleSelection READ multipleSelection WRITE setMultipleSelection NOTIFY multipleSelectionChanged)
@@ -306,6 +307,11 @@ public:
      *  fixture is selected */
     QVector3D fixturesRotation() const;
     void setFixturesRotation(QVector3D degrees);
+
+    /** Get/Set the 3D view light output multiplier of the selected fixtures.
+     *  The getter reports the first selected fixture's value */
+    qreal fixturesOutputTrim() const;
+    void setFixturesOutputTrim(qreal trim);
     void setFixtureRotation(quint32 itemID, QVector3D degrees);
 
     /** Rotate every selected fixture by the provided $degrees. This is what a
@@ -361,6 +367,7 @@ signals:
     void selectedDimmersCountChanged();
     void fixturesPositionChanged();
     void fixturesRotationChanged();
+    void fixturesOutputTrimChanged();
 
 private:
     /** Select the next available Fixture group, cycling through the

@@ -556,6 +556,43 @@ Rectangle
             {
                 width: parent.width
                 isExpanded: false
+                // a calibration of the photometric rendering, so offered with it
+                visible: selFixturesCount && View3D.useFixtureLumens ? true : false
+                sectionLabel: qsTr("Light output")
+                sectionContents:
+                    GridLayout
+                    {
+                        width: parent.width
+                        columns: 2
+                        columnSpacing: 5
+                        rowSpacing: 2
+
+                        RobotoText
+                        {
+                            height: UISettings.listItemHeight
+                            label: qsTr("Output trim (experimental)")
+                        }
+                        CustomSpinBox
+                        {
+                            Layout.fillWidth: true
+                            height: UISettings.listItemHeight
+                            from: 0
+                            to: 400
+                            suffix: "%"
+                            value: contextManager ? Math.round(contextManager.fixturesOutputTrim * 100) : 100
+                            onValueModified:
+                            {
+                                if (contextManager)
+                                    contextManager.fixturesOutputTrim = value / 100.0
+                            }
+                        }
+                    } // GridLayout
+            } // SectionBox - Light output
+
+            SectionBox
+            {
+                width: parent.width
+                isExpanded: false
                 visible: selGenericCount ? true : false
                 sectionLabel: qsTr("Scale")
                 sectionContents:

@@ -67,6 +67,13 @@ void MonitorProperties_Test::fixtureItems()
     QCOMPARE(mp.fixtureName(10,0,0), QString("Main"));
     QCOMPARE(mp.fixtureFlags(10,0,0), quint32(MonitorProperties::HiddenFlag));
 
+    // the output trim defaults to unchanged and is kept per item
+    QCOMPARE(mp.fixtureOutputTrim(10,0,0), qreal(1.0));
+    mp.setFixtureOutputTrim(10, 0, 0, 0.3);
+    mp.setFixtureOutputTrim(10, 1, 0, 2.0);
+    QCOMPARE(mp.fixtureOutputTrim(10,0,0), qreal(0.3));
+    QCOMPARE(mp.fixtureOutputTrim(10,1,0), qreal(2.0));
+
     mp.removeFixture(10);
     QCOMPARE(mp.containsFixture(10), false);
 }

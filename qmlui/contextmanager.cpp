@@ -892,6 +892,7 @@ void ContextManager::setFixtureSelection(quint32 itemID, int headIndex, bool ena
     emit selectedFixturesChanged();
     emit fixturesPositionChanged();
     emit fixturesRotationChanged();
+    emit fixturesOutputTrimChanged();
 
     // parachute if we get out of sync
     if (m_selectedFixtures.isEmpty())
@@ -1558,6 +1559,37 @@ void ContextManager::createFixtureGroup()
         return;
 
     m_fixtureManager->addItemsToNewGroup(m_selectedFixtures);
+}
+
+qreal ContextManager::fixturesOutputTrim() const
+{
+    if (m_selectedFixtures.isEmpty())
+        return 1.0;
+
+    quint32 itemID = m_selectedFixtures.first();
+    quint32 fixtureID = FixtureUtils::itemFixtureID(itemID);
+    if (m_monProps->containsFixture(fixtureID) == false)
+        return 1.0;
+
+    return m_monProps->fixtureOutputTrim(fixtureID, FixtureUtils::itemHeadIndex(itemID),
+                                         FixtureUtils::itemLinkedIndex(itemID));
+}
+
+void ContextManager::setFixturesOutputTrim(qreal trim)
+{
+    for (quint32 &itemID : m_selectedFixtures)
+    {
+        quint32 fixtureID = FixtureUtils::itemFixtureID(itemID);
+        if (m_monProps->containsFixture(fixtureID) == false)
+            continue;
+
+        m_monProps->setFixtureOutputTrim(fixtureID, FixtureUtils::itemHeadIndex(itemID),
+                                         FixtureUtils::itemLinkedIndex(itemID), trim);
+        m_3DView->updateFixtureOutputTrim(itemID);
+    }
+
+    m_doc->setModified();
+    emit fixturesOutputTrimChanged();
 }
 
 QVector3D ContextManager::fixturesRotation() const
