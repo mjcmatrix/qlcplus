@@ -49,6 +49,7 @@
 #define KXMLQLCMonitorFixtureItem   QStringLiteral("FxItem")
 #define KXMLQLCMonitorLightEmitter  QStringLiteral("LightEmitter")
 #define KXMLQLCMonitorStageItem     QStringLiteral("StageItem")
+#define KXMLQLCMonitorStageColor    QStringLiteral("Color")
 #define KXMLQLCMonitorMeshItem      QStringLiteral("MeshItem")
 
 #define KXMLQLCMonitorRendering         QStringLiteral("Rendering")
@@ -136,6 +137,7 @@ void MonitorProperties::reset()
     m_gridUnits = Meters;
     m_pointOfView = Undefined;
     m_stageType = StageSimple;
+    m_stageColor = QColor();
     m_showLabels = false;
     m_renderQuality = RENDER_DEFAULT_QUALITY;
     m_ambientLightIntensity = RENDER_DEFAULT_AMBIENT;
@@ -154,6 +156,22 @@ void MonitorProperties::reset()
 /********************************************************************
  * Environment
  ********************************************************************/
+
+QColor MonitorProperties::stageColor() const
+{
+    return m_stageColor.isValid() ? m_stageColor : defaultStageColor();
+}
+
+void MonitorProperties::setStageColor(QColor color)
+{
+    m_stageColor = color;
+}
+
+QColor MonitorProperties::defaultStageColor()
+{
+    // Qt's "lightgray", which the 3D preview stages have always used
+    return QColor(211, 211, 211);
+}
 
 void MonitorProperties::setPointOfView(MonitorProperties::PointOfView pov)
 {
@@ -790,6 +808,10 @@ bool MonitorProperties::loadXML(QXmlStreamReader &root, const Doc *mainDocument)
         }
         else if (root.name() == KXMLQLCMonitorStageItem)
         {
+            // no color attribute means a stage rendered with the default color
+            if (tAttrs.hasAttribute(KXMLQLCMonitorStageColor))
+                setStageColor(QColor(tAttrs.value(KXMLQLCMonitorStageColor).toString()));
+
             setStageType(StageType(root.readElementText().toInt()));
         }
         else if (root.name() == KXMLQLCMonitorFixtureItem)
@@ -1006,7 +1028,13 @@ bool MonitorProperties::saveXML(QXmlStreamWriter *doc, const Doc *mainDocument) 
     doc->writeEndElement();
 
 #ifdef QMLUI
-    doc->writeTextElement(KXMLQLCMonitorStageItem, QString::number(stageType()));
+    doc->writeStartElement(KXMLQLCMonitorStageItem);
+    // write the color only when one has been explicitly set, so that
+    // projects that don't use it are saved as they were before
+    if (m_stageColor.isValid())
+        doc->writeAttribute(KXMLQLCMonitorStageColor, m_stageColor.name());
+    doc->writeCharacters(QString::number(stageType()));
+    doc->writeEndElement();
 
     /* 3D view rendering settings */
     doc->writeStartElement(KXMLQLCMonitorRendering);

@@ -224,6 +224,22 @@ Rectangle
                                     contextManager.environmentSize = Qt.vector3d(envSize.x, envSize.y, value)
                             }
                         }
+                        // row 5
+                        RobotoText { height: UISettings.listItemHeight; label: qsTr("Color") }
+                        Rectangle
+                        {
+                            Layout.fillWidth: true
+                            height: UISettings.listItemHeight
+                            color: View3D.stageColor
+                            border.width: 1
+                            border.color: UISettings.bgLight
+
+                            MouseArea
+                            {
+                                anchors.fill: parent
+                                onClicked: stageColorTool.visible = !stageColorTool.visible
+                            }
+                        }
                     } // GridLayout
             } // Section box - Environment
 
@@ -927,6 +943,23 @@ Rectangle
             function(r, g, b, w, a, uv)
             {
                 View3D.genericItemsColor = Qt.rgba(r, g, b, 1.0)
+            }
+        onClose: visible = false
+    }
+
+    ColorTool
+    {
+        id: stageColorTool
+        // open to the left of the panel, where there is room for it
+        x: -width
+        y: (settingsRoot.height - height) / 2
+        z: 10
+        visible: false
+
+        onToolColorChanged:
+            function(r, g, b, w, a, uv)
+            {
+                View3D.stageColor = Qt.rgba(r, g, b, 1.0)
             }
         onClose: visible = false
     }
