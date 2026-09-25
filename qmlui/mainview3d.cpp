@@ -182,6 +182,7 @@ void MainView3D::slotRefreshView()
     // recreate the stage entity and notify the UI to update the selector
     createStage();
     emit stageIndexChanged(m_monProps->stageType());
+    emit stageColorChanged(m_monProps->stageColor());
 
     // re-apply the persisted "Rendering" settings (quality, ambient light,
     // smoke, show FPS) that may have changed on project load
@@ -3143,6 +3144,22 @@ void MainView3D::setStageIndex(int stageIndex)
     createStage();
 
     emit stageIndexChanged(stageIndex);
+}
+
+QColor MainView3D::stageColor() const
+{
+    return m_monProps->stageColor();
+}
+
+void MainView3D::setStageColor(QColor color)
+{
+    if (color == m_monProps->stageColor())
+        return;
+
+    m_monProps->setStageColor(color);
+    m_doc->setModified();
+
+    emit stageColorChanged(color);
 }
 
 void MainView3D::createStage()

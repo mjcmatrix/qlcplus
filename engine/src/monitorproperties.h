@@ -130,11 +130,20 @@ public:
     inline void setStageType(StageType type) { m_stageType = type; }
     inline StageType stageType() const { return m_stageType; }
 
+    /** Get/Set the base color of the stage rendered in the 3D preview.
+     *  A stage with no color set reports $defaultStageColor */
+    QColor stageColor() const;
+    void setStageColor(QColor color);
+
+    /** The color the 3D preview has always rendered its stages with */
+    static QColor defaultStageColor();
+
 private:
     QVector3D m_gridSize;
     GridUnits m_gridUnits;
     PointOfView m_pointOfView;
     StageType m_stageType;
+    QColor m_stageColor;
 
     /********************************************************************
      * 3D View rendering

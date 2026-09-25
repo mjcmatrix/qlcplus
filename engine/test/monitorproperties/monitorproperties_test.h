@@ -34,6 +34,7 @@ private slots:
     void view3DSettingsXML();
     void genericItems();
     void genericItemsXML();
+    void stageColor();
     void reset();
 };
 

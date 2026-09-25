@@ -169,6 +169,52 @@ void MonitorProperties_Test::view3DSettingsXML()
 #endif
 }
 
+void MonitorProperties_Test::stageColor()
+{
+    MonitorProperties mp;
+
+    // no color set reports the default, and nothing is stored
+    QCOMPARE(mp.stageColor(), MonitorProperties::defaultStageColor());
+    QCOMPARE(mp.m_stageColor.isValid(), false);
+
+    mp.setStageColor(QColor(16, 16, 16));
+    QCOMPARE(mp.stageColor(), QColor(16, 16, 16));
+
+#ifdef QMLUI
+    // the stage is saved only by the QML UI, so is its color
+    Doc doc(this);
+    mp.setStageType(MonitorProperties::StageTheatre);
+
+    QByteArray xmlData;
+    QBuffer buffer(&xmlData);
+    QVERIFY(buffer.open(QIODevice::WriteOnly));
+
+    QXmlStreamWriter writer(&buffer);
+    writer.writeStartDocument();
+    QVERIFY(mp.saveXML(&writer, &doc));
+    writer.writeEndDocument();
+    buffer.close();
+
+    MonitorProperties loaded;
+    QXmlStreamReader reader(xmlData);
+    while (reader.readNextStartElement())
+    {
+        if (reader.name() == KXMLQLCMonitorProperties)
+        {
+            QVERIFY(loaded.loadXML(reader, &doc));
+            break;
+        }
+        reader.skipCurrentElement();
+    }
+
+    QCOMPARE(loaded.stageType(), MonitorProperties::StageTheatre);
+    QCOMPARE(loaded.stageColor(), QColor(16, 16, 16));
+#endif
+
+    mp.reset();
+    QCOMPARE(mp.stageColor(), MonitorProperties::defaultStageColor());
+}
+
 void MonitorProperties_Test::genericItems()
 {
     MonitorProperties mp;
