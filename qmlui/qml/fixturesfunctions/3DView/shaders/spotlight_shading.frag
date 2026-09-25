@@ -116,13 +116,25 @@ void main()
 
     // Distance the light has travelled to reach this fragment, measured along
     // the beam axis from the emitter, the same quantity the cone radius above
-    // is a function of. Floored so a surface up against the lens cannot divide
-    // the intensity to infinity.
+    // is a function of.
+    //
+    // The inverse square law describes a point source, and only holds once
+    // the throw is several times the size of what emits the light: up close, a
+    // lens or an LED array is an extended source and does not keep getting
+    // brighter as the surface approaches. So the throw is softened by
+    // nearField, (d^2 + n^2) rather than d^2, which follows the inverse square
+    // at a distance and levels off near the lens instead of shooting up there.
+    // A metre is about five times the aperture of a typical par or batten,
+    // the usual rule of thumb for where the point source model takes over.
+    // The reference throw is softened the same way, so the light still lands
+    // unscaled at that distance and the frame's exposure does not move.
     float falloff = 1.0;
     if (referenceThrow > 0.0)
     {
-        float beamDist = max(abs(q.z) - 0.5 * headLength, 0.25);
-        falloff = (referenceThrow * referenceThrow) / (beamDist * beamDist);
+        const float nearField = 1.0;
+        float beamDist = max(abs(q.z) - 0.5 * headLength, 0.0);
+        falloff = (referenceThrow * referenceThrow + nearField * nearField) /
+                  (beamDist * beamDist + nearField * nearField);
     }
 
     vec4 gSample = SAMPLE_TEX2D(goboTex, tc.xy);

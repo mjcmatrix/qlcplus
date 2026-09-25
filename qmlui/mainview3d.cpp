@@ -32,6 +32,7 @@
 #include <QXmlStreamReader>
 #include <QRegularExpression>
 #include <QtMath>
+#include <algorithm>
 
 #include <Qt3DCore/QTransform>
 #include <Qt3DCore/QNode>
@@ -103,6 +104,7 @@ MainView3D::MainView3D(QQuickView *view, Doc *doc, QObject *parent)
     , m_markerEntity(nullptr)
     , m_stageEntity(nullptr)
     , m_referenceCandela(0)
+    , m_fallbackCandela(0)
     , m_referenceThrow(0)
 {
     setContextResource("qrc:/3DView.qml");
@@ -922,6 +924,10 @@ void MainView3D::createFixtureItem(quint32 fxID, quint16 headIndex, quint16 link
 
 void MainView3D::setFixtureFlags(quint32 itemID, quint32 flags)
 {
+    // hiding or showing a fixture takes it out of, or puts it back into, the
+    // rig whose scale the reference throw measures
+    updateReferenceThrow();
+
     SceneItem *meshRef = m_entitiesMap.value(itemID, nullptr);
     if (meshRef == nullptr)
         return;
@@ -1548,8 +1554,19 @@ void MainView3D::updateFixtureItem(Fixture *fixture, quint16 headIndex, quint16 
 
         // The 3D view renders the light this head actually casts, so a white
         // emitter is tinted by the colour temperature its definition declares
-        // rather than being rendered as pure white.
-        color = FixtureUtils::headColor(fixture, headIdx, true);
+        // rather than being rendered as pure white. With the Lumens setting on,
+        // the emitters of the head are added up rather than blended, so how
+        // much light the head makes follows which of them are lit.
+        if (useFixtureLumens())
+        {
+            qreal emissionGain = 0;
+            color = FixtureUtils::headEmission(fixture, headIdx, emissionGain);
+            intensityValue *= emissionGain;
+        }
+        else
+        {
+            color = FixtureUtils::headColor(fixture, headIdx, true);
+        }
 
         if (singleBeamMesh)
         {
@@ -3207,11 +3224,22 @@ void MainView3D::setUseFixtureLumens(bool use)
     m_monProps->setUseFixtureLumens(use);
     m_doc->setModified();
     emit useFixtureLumensChanged(use);
+
+    // the setting changes how a head's emitters are turned into light (see
+    // updateFixtureItem), so every fixture has to be worked out again
+    QByteArray all;
+    for (Fixture *fixture : m_doc->fixtures())
+        updateFixture(fixture, all);
 }
 
 qreal MainView3D::referenceCandela() const
 {
     return m_referenceCandela;
+}
+
+qreal MainView3D::fallbackCandela() const
+{
+    return m_fallbackCandela;
 }
 
 /** Nominal output of an LED Bar (Pixels) whose definition declares no Lumens:
@@ -3306,8 +3334,10 @@ qreal MainView3D::fixtureEmitterCandela(Fixture *fixture, bool allowNominal)
 void MainView3D::updateReferenceCandela()
 {
     qreal reference = 0;
+    QList<qreal> declared;
 
     for (Fixture *fixture : m_doc->fixtures())
+    {
         // Only fixtures that actually declare their output set the reference.
         // The nominal above is a stand in for missing data, and a stand in must
         // never become the thing everything else is measured against: five of
@@ -3315,7 +3345,34 @@ void MainView3D::updateReferenceCandela()
         // at all, and a nominal output squeezed into that solid angle comes out
         // at tens of thousands of candela - enough to take over as the project
         // reference and dim every real fixture in the rig around it.
-        reference = qMax(reference, fixtureEmitterCandela(fixture, false));
+        qreal candela = fixtureEmitterCandela(fixture, false);
+        if (candela <= 0)
+            continue;
+
+        reference = qMax(reference, candela);
+        declared.append(candela);
+    }
+
+    // A fixture that declares nothing used to render at the reference, i.e.
+    // as bright as the brightest emitter in the rig. In a rig that mixes a
+    // few high output pars with smaller fixtures that is a long way from
+    // typical, so give it the middle of the rig instead: the median of what
+    // the declared fixtures put out. Taken per fixture, so a type the rig
+    // carries many of weighs in accordingly.
+    qreal fallback = 0;
+    if (declared.isEmpty() == false)
+    {
+        std::sort(declared.begin(), declared.end());
+        int mid = declared.count() / 2;
+        fallback = declared.count() % 2 ? declared.at(mid) :
+                                          (declared.at(mid - 1) + declared.at(mid)) / 2.0;
+    }
+
+    if (fallback != m_fallbackCandela)
+    {
+        m_fallbackCandela = fallback;
+        emit fallbackCandelaChanged(m_fallbackCandela);
+    }
 
     if (reference == m_referenceCandela)
         return;
@@ -3345,6 +3402,12 @@ void MainView3D::updateReferenceThrow()
         {
             quint16 headIndex = m_monProps->fixtureHeadIndex(subID);
             quint16 linkedIndex = m_monProps->fixtureLinkedIndex(subID);
+
+            // A hidden item casts no light, so it is not part of the rig either.
+            // Projects park unused fixtures hidden at the origin, and counting
+            // them drags the reference down towards the floor.
+            if (m_monProps->fixtureFlags(fixture->id(), headIndex, linkedIndex) & MonitorProperties::HiddenFlag)
+                continue;
 
             // Positions are stored in millimetres, measured up from the floor,
             // which is where the shader's world units start too.
