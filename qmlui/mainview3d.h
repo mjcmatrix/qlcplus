@@ -107,6 +107,7 @@ class MainView3D final : public PreviewContext
     Q_PROPERTY(QString meshDirectory READ meshDirectory CONSTANT)
     Q_PROPERTY(QStringList stagesList READ stagesList CONSTANT)
     Q_PROPERTY(int stageIndex READ stageIndex WRITE setStageIndex NOTIFY stageIndexChanged)
+    Q_PROPERTY(QColor stageColor READ stageColor WRITE setStageColor NOTIFY stageColorChanged)
     Q_PROPERTY(float ambientIntensity READ ambientIntensity WRITE setAmbientIntensity NOTIFY ambientIntensityChanged)
     Q_PROPERTY(float smokeAmount READ smokeAmount WRITE setSmokeAmount NOTIFY smokeAmountChanged)
 
@@ -498,6 +499,10 @@ public:
     int stageIndex() const;
     void setStageIndex(int stageIndex);
 
+    /** Base color the stage is rendered with */
+    QColor stageColor() const;
+    void setStageColor(QColor color);
+
     /** Get/Set the ambient light intensity */
     float ambientIntensity() const;
     void setAmbientIntensity(float ambientIntensity);
@@ -520,6 +525,7 @@ protected:
 signals:
     void renderQualityChanged(RenderQuality renderQuality);
     void stageIndexChanged(int stageIndex);
+    void stageColorChanged(QColor stageColor);
     void ambientIntensityChanged(qreal ambientIntensity);
     void smokeAmountChanged(float smokeAmount);
 
