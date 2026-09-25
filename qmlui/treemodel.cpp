@@ -167,6 +167,15 @@ TreeModelItem *TreeModel::addItem(QString label, QVariantList data, QString path
                         this, SLOT(slotRoleChanged(TreeModelItem*,int,const QVariant&)));
                 qDebug() << "Tree" << this << "connected to tree" << item->children();
             }
+
+            // Return the leaf item just added, not the folder it was added
+            // to, so callers can act on it (e.g. mark it selected).
+            if (item->hasChildren())
+            {
+                TreeModelItem *leaf = item->children()->itemAtPath(label);
+                if (leaf != nullptr)
+                    item = leaf;
+            }
         }
         else
         {
@@ -176,6 +185,14 @@ TreeModelItem *TreeModel::addItem(QString label, QVariantList data, QString path
                 connect(item->children(), SIGNAL(roleChanged(TreeModelItem*,int,const QVariant&)),
                         this, SLOT(slotRoleChanged(TreeModelItem*,int,const QVariant&)));
                 qDebug() << "Tree" << this << "connected to tree" << item->children();
+            }
+
+            // Same as above, but the leaf is further down the nested path.
+            if (item->hasChildren())
+            {
+                TreeModelItem *leaf = item->children()->itemAtPath(newPath + TreeModel::separator() + label);
+                if (leaf != nullptr)
+                    item = leaf;
             }
         }
     }

@@ -115,6 +115,16 @@ public:
       */
     Q_INVOKABLE quint32 createFunction(int type, QVariantList fixturesList = QVariantList());
 
+    /** Create a new Collection containing the currently selected Functions */
+    Q_INVOKABLE quint32 createCollectionFromSelection();
+
+    /** Create a new Chaser with a step for each currently selected Function */
+    Q_INVOKABLE quint32 createChaserFromSelection();
+
+    /** Create a new folder named $folderName and move the currently
+     *  selected Functions/folders into it */
+    Q_INVOKABLE bool createFolderFromSelection(QString folderName);
+
     /** Create a new Audio/Video Function for each
      *  file path provided in fileList.
      */
@@ -167,8 +177,16 @@ public:
     /** Move the currently selected Function to the specified $newPath */
     Q_INVOKABLE void moveFunctions(QString newPath);
 
-    /** Clone the currently selected Functions */
-    Q_INVOKABLE void cloneFunctions();
+    /** Clone the currently selected Functions.
+     *  If $customName is not empty, it is used to name the clone, which
+     *  requires exactly one Function to be selected. Returns false if
+     *  $customName is already taken by another Function. */
+    Q_INVOKABLE bool cloneFunctions(QString customName = QString());
+
+    /** Return a unique suggested name for a clone of the Function with the
+     *  specified $fid, e.g. "Foo (Copy)" or "Foo (Copy) 2" if that is
+     *  already taken */
+    Q_INVOKABLE QString suggestedCloneName(quint32 fid) const;
 
     /** Generic method to delete a list of item IDs specified in $list.
      *  This is used from within a Function editor and items can be of any type
@@ -216,10 +234,21 @@ public:
 protected:
     quint32 addFunctiontoDoc(Function *func, QString name, bool select);
     void addFunctionTreeItem(Function *func);
+    void emitFunctionCounts();
     void clearTree();
     void moveFunction(quint32 fID, QString newPath);
     void storeExpandedPaths();
     void restoreExpandedPaths();
+
+    /** Return the folder path (Doc/Function form, '/' separated) that a newly
+     *  created or cloned item should be placed into, based on the currently
+     *  selected folder or, failing that, the currently selected Function's
+     *  parent folder. Returns an empty (root) path when nothing is selected */
+    QString currentInsertPath() const;
+
+    /** Return $baseName, or $baseName with a numeric suffix appended, such
+     *  that the result is not already used by another Function in the Doc */
+    QString uniqueFunctionName(const QString &baseName) const;
 
 signals:
     void functionsListChanged();

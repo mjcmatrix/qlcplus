@@ -46,6 +46,31 @@ SidePanel
         {
             confirmDeleteSelectedItems()
         }
+        function onRequestFunctionRename()
+        {
+            renameFocusedItem()
+        }
+    }
+
+    // Renames the single currently selected item (e.g. on F2). Unlike the
+    // toolbar rename button, this never offers numbering, since it only
+    // ever applies to one item.
+    function renameFocusedItem()
+    {
+        if (functionManager.isEditing || selectedItemsCount !== 1)
+            return
+
+        var selNames = functionManager.selectedItemNames()
+        if (selNames.length === 0)
+            return
+
+        textInputPopup.showNumbering = false
+        textInputPopup.title = qsTr("Rename items")
+        textInputPopup.isFolder = false
+        textInputPopup.isContainerFolder = false
+        textInputPopup.isCloneName = false
+        textInputPopup.editText = selNames[0]
+        textInputPopup.open()
     }
 
     function createFunctionAndEditor(fType)
@@ -199,12 +224,22 @@ SidePanel
         id: textInputPopup
 
         property bool isFolder: false
+        property bool isContainerFolder: false
+        property bool isCloneName: false
 
         onAccepted:
         {
             var success
 
-            if (isFolder)
+            if (isCloneName)
+            {
+                success = functionManager.cloneFunctions(editText)
+            }
+            else if (isContainerFolder)
+            {
+                success = functionManager.createFolderFromSelection(editText)
+            }
+            else if (isFolder)
             {
                 success = functionManager.createFolder(editText)
             }
@@ -308,6 +343,8 @@ SidePanel
                     {
                         textInputPopup.title = qsTr("Enter a unique name")
                         textInputPopup.isFolder = true
+                        textInputPopup.isContainerFolder = false
+                        textInputPopup.isCloneName = false
                         textInputPopup.editText = qsTr("New folder")
                         textInputPopup.open()
                     }
@@ -318,6 +355,45 @@ SidePanel
                         createFunctionAndEditor(fType)
                     }
                     onClosed: addFunction.checked = false
+                }
+            }
+            IconButton
+            {
+                id: addContainerFromSelection
+                visible: qlcplus.accessMask & App.AC_FunctionEditing
+                z: 2
+                width: iconSize
+                height: iconSize
+                faSource: FontAwesome.fa_layer_group
+                faColor: UISettings.fgMain
+                tooltip: qsTr("Add the selected items to a new container")
+                checkable: true
+                counter: selectedItemsCount && !functionManager.isEditing
+
+                AddContainerMenu
+                {
+                    visible: addContainerFromSelection.checked
+                    x: -width
+
+                    function requestFolder()
+                    {
+                        textInputPopup.title = qsTr("Enter a unique name")
+                        textInputPopup.isFolder = true
+                        textInputPopup.isContainerFolder = true
+                        textInputPopup.isCloneName = false
+                        textInputPopup.editText = qsTr("New folder")
+                        textInputPopup.open()
+                    }
+
+                    onEntryClicked: function(fType)
+                    {
+                        close()
+                        if (fType === QLCFunction.ChaserType)
+                            functionManager.createChaserFromSelection()
+                        else if (fType === QLCFunction.CollectionType)
+                            functionManager.createCollectionFromSelection()
+                    }
+                    onClosed: addContainerFromSelection.checked = false
                 }
             }
             IconButton
@@ -357,13 +433,20 @@ SidePanel
                 counter: selectedItemsCount && !functionManager.isEditing
                 onClicked:
                 {
+                    if (selectedItemsCount === 1)
+                    {
+                        renameFocusedItem()
+                        return
+                    }
+
                     var selNames = functionManager.selectedItemNames()
                     if (selNames.length === 0)
                         return
-                    if (selNames.length > 1)
-                        textInputPopup.showNumbering = true
+                    textInputPopup.showNumbering = true
                     textInputPopup.title = qsTr("Rename items")
                     textInputPopup.isFolder = false
+                    textInputPopup.isContainerFolder = false
+                    textInputPopup.isCloneName = false
                     textInputPopup.editText = selNames[0]
                     textInputPopup.open()
                 }
@@ -378,7 +461,23 @@ SidePanel
                 faColor: UISettings.fgMain
                 tooltip: qsTr("Clone the selected functions")
                 counter: functionManager.selectedFunctionCount && !functionManager.isEditing
-                onClicked: functionManager.cloneFunctions()
+                onClicked:
+                {
+                    if (functionManager.selectedFunctionCount === 1)
+                    {
+                        var idList = functionManager.selectedFunctionsID()
+                        textInputPopup.title = qsTr("Name for new item")
+                        textInputPopup.isFolder = false
+                        textInputPopup.isContainerFolder = false
+                        textInputPopup.isCloneName = true
+                        textInputPopup.editText = functionManager.suggestedCloneName(idList[0])
+                        textInputPopup.open()
+                    }
+                    else
+                    {
+                        functionManager.cloneFunctions()
+                    }
+                }
             }
 
             IconButton

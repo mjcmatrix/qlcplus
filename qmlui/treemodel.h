@@ -113,6 +113,7 @@ public:
     /** Get the list of first level items of this tree. This doesn't include children. */
     QList<TreeModelItem *> items() const;
 
+
     /** Set columns data on a specific item with the provided $path */
     void setPathData(QString path, QVariantList data);
 

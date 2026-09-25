@@ -202,6 +202,7 @@ void App::startup()
     m_virtualConsole = new VirtualConsole(this, m_doc, m_contextManager);
     m_showManager = new ShowManager(this, m_doc);
     connect(m_showManager, &ShowManager::itemClicked, m_contextManager, &ContextManager::setLastClickedType);
+    connect(m_functionManager, &FunctionManager::itemClicked, m_contextManager, &ContextManager::setLastClickedType);
 
     m_networkManager = new NetworkManager(this, m_doc, m_virtualConsole, m_simpleDesk);
     rootContext()->setContextProperty("networkManager", m_networkManager);

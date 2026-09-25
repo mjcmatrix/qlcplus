@@ -741,6 +741,20 @@ void ContextManager::handleKeyPress(QKeyEvent *e)
         return;
     }
 
+    // 'F2' renames the currently focused Function/folder in the Functions
+    // Manager. Like Delete, it is ignored while a Function editor is open,
+    // since the selection then belongs to the editor.
+    if (e->key() == Qt::Key_F2)
+    {
+        if (!m_editingEnabled &&
+            (m_lastClickedType == App::FunctionDragItem || m_lastClickedType == App::FolderDragItem))
+        {
+            emit requestFunctionRename();
+            e->accept();
+        }
+        return;
+    }
+
     for (PreviewContext *context : m_contextsMap.values()) // C++11
         context->handleKeyEvent(e, true);
 }
