@@ -913,6 +913,7 @@ void MainView3D::createFixtureItem(quint32 fxID, quint16 headIndex, quint16 link
 
     newItem->setProperty("itemID", itemID);
     newItem->setProperty("bulbCandela", fixtureEmitterCandela(fixture));
+    newItem->setProperty("outputTrim", m_monProps->fixtureOutputTrim(fxID, headIndex, linkedIndex));
     if (meshPath.isEmpty() == false)
         newItem->setProperty("itemSource", meshPath);
 
@@ -920,6 +921,18 @@ void MainView3D::createFixtureItem(quint32 fxID, quint16 headIndex, quint16 link
     // whenever a fixture is added
     updateReferenceCandela();
     updateReferenceThrow();
+}
+
+void MainView3D::updateFixtureOutputTrim(quint32 itemID)
+{
+    SceneItem *meshRef = m_entitiesMap.value(itemID, nullptr);
+    if (meshRef == nullptr || meshRef->m_rootItem == nullptr)
+        return;
+
+    meshRef->m_rootItem->setProperty("outputTrim",
+        m_monProps->fixtureOutputTrim(FixtureUtils::itemFixtureID(itemID),
+                                      FixtureUtils::itemHeadIndex(itemID),
+                                      FixtureUtils::itemLinkedIndex(itemID)));
 }
 
 void MainView3D::setFixtureFlags(quint32 itemID, quint32 flags)

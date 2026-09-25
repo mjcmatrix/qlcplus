@@ -142,6 +142,9 @@ Entity
     property real bulbCandela: 0
     /* bulbCandela, or when the definition has no data the median output of
        the fixtures in the project that do (see MainView3D::fallbackCandela) */
+    /* Multiplier on this fixture's light set in its item properties, to
+       calibrate the render against the room. Applies with Lumens on only */
+    property real outputTrim: 1.0
     property real effectiveCandela:
         bulbCandela > 0 ? bulbCandela : (View3D ? View3D.fallbackCandela : 0)
     /* How far the current zoom concentrates the beam, as the ratio of the two
@@ -163,7 +166,7 @@ Entity
        declares any lumens. */
     property real lumensScale:
         (View3D && View3D.useFixtureLumens && effectiveCandela > 0 && View3D.referenceCandela > 0) ?
-            (effectiveCandela / View3D.referenceCandela) * beamConcentration : 1.0
+            (effectiveCandela / View3D.referenceCandela) * beamConcentration * outputTrim : 1.0
 
     property vector3d lightDir: Math3D.getLightDirection(transform, null, tiltTransform)
 

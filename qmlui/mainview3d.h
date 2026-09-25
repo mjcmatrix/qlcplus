@@ -272,6 +272,9 @@ public:
     /** Set/update the flags of a fixture item */
     void setFixtureFlags(quint32 itemID, quint32 flags);
 
+    /** Push the light output multiplier stored for $itemID to its 3D item */
+    void updateFixtureOutputTrim(quint32 itemID);
+
     Q_INVOKABLE void initializeFixture(quint32 itemID, QEntity *fxEntity, const QSceneLoader *loader);
 
     Q_INVOKABLE QString makeShader(QString str);
