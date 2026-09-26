@@ -211,6 +211,45 @@ Rectangle
         border.color: UISettings.selection
     }
 
+    /* Grab handles on the range's edges, dragged (or Shift-clicked
+       elsewhere) to resize it - see rulerMouseArea above. z:1 keeps them
+       (and the duration text below) above the ruler's Canvas, like the
+       cursor's own handle */
+    Rectangle
+    {
+        z: 1
+        x: rangeLeft - 5
+        y: headerHeight - 10
+        width: 10
+        height: 10
+        visible: showManager.hasTimeRange && x >= visibleX - width && x <= visibleX + visibleWidth
+        color: UISettings.selection
+    }
+
+    Rectangle
+    {
+        z: 1
+        x: rangeRight - 5
+        y: headerHeight - 10
+        width: 10
+        height: 10
+        visible: showManager.hasTimeRange && x >= visibleX - width && x <= visibleX + visibleWidth
+        color: UISettings.selection
+    }
+
+    // the selected time range's duration, to the right of its left edge's handle
+    RobotoText
+    {
+        z: 1
+        x: rangeLeft + 8
+        y: headerHeight - 10
+        height: 10
+        visible: showManager.hasTimeRange && x >= visibleX && x <= visibleX + visibleWidth
+        labelColor: UISettings.selection
+        fontSize: height * 0.85
+        label: TimeUtils.msToString(showManager.rangeEnd - showManager.rangeStart)
+    }
+
     Canvas
     {
         id: timeHeader
@@ -315,33 +354,65 @@ Rectangle
     }
 
     /* Clicking on the ruler moves the cursor, dragging on it selects a
-       time range */
+       time range. Dragging from near an existing range's edge (or the small
+       handles drawn on it) resizes that edge instead of starting a new
+       range; Shift-clicking does the same without a drag, moving whichever
+       edge is nearer to the click point. Both let the range flip if pulled
+       past its other edge, same as an ordinary reversed drag. */
     MouseArea
     {
+        id: rulerMouseArea
         enabled: showTimeMarkers
         anchors.fill: parent
         // the ruler selects ranges rather than flicking the timeline
         preventStealing: true
 
+        // how close to an edge (or its handle) counts as grabbing it
+        readonly property int edgeGrabPx: 8
+
         property real pressX: 0
         property bool rangeActive: false
+        // 0: select a brand new range, 1: resize the range start, 2: resize the range end
+        property int dragMode: 0
+
+        function nearestEdgeIsStart(x)
+        {
+            return Math.abs(x - rangeLeft) <= Math.abs(x - rangeRight)
+        }
 
         function updateRange(mouse)
         {
-            var from = snapRangePos(pressX, mouse.modifiers)
             var to = snapRangePos(Math.max(0, Math.min(mouse.x, width)), mouse.modifiers)
-            showManager.setTimeRange(posToTime(from), posToTime(to))
+
+            if (dragMode === 1)
+                showManager.setTimeRange(posToTime(to), showManager.rangeEnd)
+            else if (dragMode === 2)
+                showManager.setTimeRange(showManager.rangeStart, posToTime(to))
+            else
+            {
+                var from = snapRangePos(pressX, mouse.modifiers)
+                showManager.setTimeRange(posToTime(from), posToTime(to))
+            }
         }
 
         onPressed: (mouse) =>
         {
             pressX = mouse.x
             rangeActive = false
+            dragMode = 0
+
+            if (showManager.hasTimeRange)
+            {
+                if (Math.abs(mouse.x - rangeLeft) <= edgeGrabPx)
+                    dragMode = 1
+                else if (Math.abs(mouse.x - rangeRight) <= edgeGrabPx)
+                    dragMode = 2
+            }
         }
 
         onPositionChanged: (mouse) =>
         {
-            if (!rangeActive && Math.abs(mouse.x - pressX) < Qt.styleHints.startDragDistance)
+            if (!rangeActive && dragMode === 0 && Math.abs(mouse.x - pressX) < Qt.styleHints.startDragDistance)
                 return
 
             rangeActive = true
@@ -356,9 +427,20 @@ Rectangle
 
         onClicked: (mouse) =>
         {
-            // the click following a range selection
+            // the click following a range selection or edge resize
             if (rangeActive)
                 return
+
+            if ((mouse.modifiers & Qt.ShiftModifier) && showManager.hasTimeRange)
+            {
+                var t = posToTime(snapRangePos(Math.max(0, Math.min(mouse.x, width)), mouse.modifiers))
+                if (nearestEdgeIsStart(mouse.x))
+                    showManager.setTimeRange(t, showManager.rangeEnd)
+                else
+                    showManager.setTimeRange(showManager.rangeStart, t)
+                return
+            }
+
             tlHeaderCursorLayer.clicked(mouse.x, mouse.y)
         }
     }
