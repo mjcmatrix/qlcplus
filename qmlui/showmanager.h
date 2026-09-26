@@ -691,9 +691,12 @@ public:
      * Removing the range deletes the items within it, shifts back the
      * items after it and crops the items crossing its edges. Inserting
      * space shifts forward the items from the range start, splitting in
-     * two the items crossing it. Items crossing the range edges must be
-     * of a Function that can be cropped, and none of the items to delete,
-     * crop or split can be locked
+     * two the items crossing it, unless the Function can't be split (eg.
+     * Audio, Video), in which case the item is left where it is,
+     * overlapping the inserted space, instead of blocking the insertion.
+     * Items crossing the range edges to remove must be of a Function that
+     * can be cropped, and none of the items to delete or crop, nor a
+     * locked item to split, can go ahead
      */
     Q_INVOKABLE QVariantMap timeRangeEditInfo(bool remove) const;
 

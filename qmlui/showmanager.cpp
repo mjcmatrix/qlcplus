@@ -4367,6 +4367,8 @@ ShowManager::TimeRangePlan ShowManager::timeRangePlan(bool remove) const
                 }
             }
 
+            bool skipItem = false;
+
             if (edit.action != TimeRangeEdit::Move)
             {
                 QString reason;
@@ -4377,10 +4379,19 @@ ShowManager::TimeRangePlan ShowManager::timeRangePlan(bool remove) const
                                                                  : tr("the item can't be cropped");
 
                 if (reason.isEmpty() == false)
-                    plan.blockers.append(QString("%1 (%2): %3").arg(func->name(), track->name(), reason));
+                {
+                    if (remove == false && edit.action == TimeRangeEdit::Split)
+                        // rather than blocking the whole insertion, leave an item that
+                        // can't be split (eg. Audio, Video) where it is, overlapping
+                        // the inserted space
+                        skipItem = true;
+                    else
+                        plan.blockers.append(QString("%1 (%2): %3").arg(func->name(), track->name(), reason));
+                }
             }
 
-            plan.items.append(edit);
+            if (skipItem == false)
+                plan.items.append(edit);
         }
     }
 
