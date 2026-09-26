@@ -489,14 +489,88 @@ Rectangle
                 height: width
                 faSource: FontAwesome.fa_arrows_left_right
                 faColor: "limegreen"
-                tooltip: qsTr("Insert empty space in the selected time range, moving forward what follows\n(drag on the ruler to select a time range)")
-                enabled: showManager.isEditing && showManager.hasTimeRange && !showManager.isPlaying
+                tooltip: qsTr("Insert empty space in the Show, moving forward what follows\n(drag on the ruler to select a time range, or insert a given duration at the cursor)")
+                enabled: showManager.isEditing && !showManager.isPlaying
                 onClicked:
                 {
+                    if (!showManager.hasTimeRange)
+                    {
+                        insertDurationPopup.seconds = 0
+                        insertDurationPopup.milliseconds = 0
+                        insertDurationPopup.open()
+                        return
+                    }
+
                     var info = showManager.timeRangeEditInfo(false)
                     if (timeRangeErrorPopup.check(info, qsTr("Insert time range"),
                                                   qsTr("Empty space can't be inserted in the time range.")))
                         showManager.insertTimeRange()
+                }
+
+                CustomPopupDialog
+                {
+                    id: insertDurationPopup
+                    title: qsTr("Insert empty space")
+
+                    // 7 days is a generous sanity limit against a fat-fingered duration
+                    readonly property int maxDurationMs: 7 * 24 * 3600 * 1000
+
+                    property alias seconds: secondsSpin.value
+                    property alias milliseconds: msSpin.value
+                    property int durationMs: (seconds * 1000) + milliseconds
+
+                    onDurationMsChanged: setButtonStatus(0, durationMs > 0 && durationMs <= maxDurationMs)
+                    onOpened: setButtonStatus(0, durationMs > 0 && durationMs <= maxDurationMs)
+
+                    onAccepted:
+                    {
+                        showManager.setTimeRange(showManager.currentTime, showManager.currentTime + durationMs)
+                        var info = showManager.timeRangeEditInfo(false)
+                        if (timeRangeErrorPopup.check(info, qsTr("Insert time range"),
+                                                      qsTr("Empty space can't be inserted at the cursor.")))
+                            showManager.insertTimeRange()
+                        else
+                            showManager.clearTimeRange()
+                    }
+
+                    onRejected: showManager.clearTimeRange()
+
+                    contentItem:
+                        ColumnLayout
+                        {
+                            spacing: 5
+
+                            RobotoText
+                            {
+                                label: qsTr("Insert this much empty space at the cursor (%1):")
+                                            .arg(TimeUtils.msToString(showManager.currentTime))
+                            }
+
+                            GridLayout
+                            {
+                                columns: 4
+                                rowSpacing: 5
+                                columnSpacing: 5
+
+                                RobotoText { label: qsTr("Seconds") }
+                                CustomSpinBox
+                                {
+                                    id: secondsSpin
+                                    Layout.fillWidth: true
+                                    from: 0
+                                    to: 7 * 24 * 3600
+                                }
+
+                                RobotoText { label: qsTr("Milliseconds") }
+                                CustomSpinBox
+                                {
+                                    id: msSpin
+                                    Layout.fillWidth: true
+                                    from: 0
+                                    to: 999
+                                }
+                            }
+                        }
                 }
             }
 
