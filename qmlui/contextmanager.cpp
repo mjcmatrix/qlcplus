@@ -1132,33 +1132,10 @@ QVector3D ContextManager::fixturesPosition() const
 
 void ContextManager::setFixturesPosition(QVector3D position)
 {
-    // an absolute position identifies a single fixture. When more than one item
-    // is selected the value entered is an offset instead, applied by moveFixtures
-    if (m_selectedFixtures.count() != 1)
+    if (m_selectedFixtures.isEmpty())
         return;
 
-    quint32 itemID = m_selectedFixtures.first();
-    quint32 fxID = FixtureUtils::itemFixtureID(itemID);
-    quint16 headIndex = FixtureUtils::itemHeadIndex(itemID);
-    quint16 linkedIndex = FixtureUtils::itemLinkedIndex(itemID);
-
-    // do not move locked items
-    if (m_monProps->fixtureFlags(fxID, headIndex, linkedIndex) & MonitorProperties::LockedFlag)
-        return;
-
-    QVector3D currPos = m_monProps->fixturePosition(fxID, headIndex, linkedIndex);
-
-    Tardis::instance()->enqueueAction(Tardis::FixtureSetPosition, itemID, QVariant(currPos), QVariant(position));
-
-    m_monProps->setFixturePosition(fxID, headIndex, linkedIndex, position);
-    if (m_3DView->isEnabled())
-        m_3DView->updateFixturePosition(itemID, position);
-
-    emit fixturesPositionChanged();
-}
-
-void ContextManager::moveFixtures(QVector3D offset)
-{
+    // relative position change
     for (quint32 &itemID : m_selectedFixtures)
     {
         quint32 fxID = FixtureUtils::itemFixtureID(itemID);
@@ -1170,7 +1147,7 @@ void ContextManager::moveFixtures(QVector3D offset)
             continue;
 
         QVector3D currPos = m_monProps->fixturePosition(fxID, headIndex, linkedIndex);
-        QVector3D newPos = currPos + offset;
+        QVector3D newPos = currPos + position;
         Tardis::instance()->enqueueAction(Tardis::FixtureSetPosition, itemID, QVariant(currPos), QVariant(newPos));
 
         m_monProps->setFixturePosition(fxID, headIndex, linkedIndex, newPos);
@@ -1593,30 +1570,7 @@ QVector3D ContextManager::fixturesRotation() const
 
 void ContextManager::setFixturesRotation(QVector3D degrees)
 {
-    // an absolute rotation identifies a single fixture. When more than one item
-    // is selected the value entered is an offset instead, applied by rotateFixtures
-    if (m_selectedFixtures.count() != 1)
-        return;
-
-    quint32 itemID = m_selectedFixtures.first();
-    quint32 fxID = FixtureUtils::itemFixtureID(itemID);
-    quint16 headIndex = FixtureUtils::itemHeadIndex(itemID);
-    quint16 linkedIndex = FixtureUtils::itemLinkedIndex(itemID);
-    QVector3D rotation = m_monProps->fixtureRotation(fxID, headIndex, linkedIndex);
-
-    Tardis::instance()->enqueueAction(Tardis::FixtureSetRotation, itemID, QVariant(rotation), QVariant(degrees));
-
-    m_monProps->setFixtureRotation(fxID, headIndex, linkedIndex, degrees);
-    if (m_2DView->isEnabled())
-        m_2DView->updateFixtureRotation(itemID, degrees);
-    if (m_3DView->isEnabled())
-        m_3DView->updateFixtureRotation(itemID, degrees);
-
-    emit fixturesRotationChanged();
-}
-
-void ContextManager::rotateFixtures(QVector3D degrees)
-{
+    // relative rotation change
     for (quint32 &itemID : m_selectedFixtures)
     {
         quint32 fxID = FixtureUtils::itemFixtureID(itemID);

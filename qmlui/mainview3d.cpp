@@ -2840,31 +2840,18 @@ QVector3D MainView3D::genericItemsPosition() const
 
 void MainView3D::setGenericItemsPosition(QVector3D pos)
 {
-    // an absolute position identifies a single item. When more than one item is
-    // selected the value entered is an offset instead, applied by moveGenericItems
-    if (m_genericSelectedItems.count() != 1)
+    if (m_genericSelectedItems.isEmpty())
         return;
 
-    quint32 itemID = m_genericSelectedItems.first();
-
-    // do not move locked items
-    if (m_monProps->itemFlags(itemID) & MonitorProperties::LockedFlag)
-        return;
-
-    updateGenericItemPosition(itemID, pos);
-
-    emit genericItemsPositionChanged();
-}
-
-void MainView3D::moveGenericItems(QVector3D offset)
-{
+    // relative position change
     for (int &itemID : m_genericSelectedItems)
     {
         // do not move locked items
         if (m_monProps->itemFlags(itemID) & MonitorProperties::LockedFlag)
             continue;
 
-        updateGenericItemPosition(itemID, m_monProps->itemPosition(itemID) + offset);
+        QVector3D newPos = m_monProps->itemPosition(itemID) + pos;
+        updateGenericItemPosition(itemID, newPos);
     }
 
     emit genericItemsPositionChanged();
@@ -2905,21 +2892,13 @@ QVector3D MainView3D::genericItemsRotation() const
 
 void MainView3D::setGenericItemsRotation(QVector3D rot)
 {
-    // an absolute rotation identifies a single item. When more than one item is
-    // selected the value entered is an offset instead, applied by rotateGenericItems
-    if (m_genericSelectedItems.count() != 1)
+    if (m_genericSelectedItems.isEmpty())
         return;
 
-    updateGenericItemRotation(m_genericSelectedItems.first(), rot);
-
-    emit genericItemsRotationChanged();
-}
-
-void MainView3D::rotateGenericItems(QVector3D degrees)
-{
+    // relative rotation change
     for (int &itemID : m_genericSelectedItems)
     {
-        QVector3D newRot = m_monProps->itemRotation(itemID) + degrees;
+        QVector3D newRot = m_monProps->itemRotation(itemID) + rot;
 
         // normalize back to a 0-359 range
         if (newRot.x() < 0) newRot.setX(newRot.x() + 360);
@@ -2933,7 +2912,6 @@ void MainView3D::rotateGenericItems(QVector3D degrees)
 
         updateGenericItemRotation(itemID, newRot);
     }
-
     emit genericItemsRotationChanged();
 }
 

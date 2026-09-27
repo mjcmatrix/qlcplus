@@ -465,24 +465,17 @@ public:
     QColor genericItemsColor() const;
     void setGenericItemsColor(QColor color);
 
-    /** Set/Get the position of the selected generic items. The setter is an
-     *  absolute position, so it applies only when a single item is selected */
+    /** Set/Get the position of the selected generic items. The setter moves
+     *  every selected item by the provided offset */
     void updateGenericItemPosition(quint32 itemID, QVector3D pos);
     QVector3D genericItemsPosition() const;
     void setGenericItemsPosition(QVector3D pos);
 
-    /** Move every selected generic item by the provided $offset. This is what a
-     *  multiple selection edits, as no single absolute position can describe it */
-    Q_INVOKABLE void moveGenericItems(QVector3D offset);
-
-    /** Set/Get the rotation of the selected generic items. The setter is an
-     *  absolute rotation, so it applies only when a single item is selected */
+    /** Set/Get the rotation of the selected generic items. The setter moves
+     *  every selected item by the provided offset */
     void updateGenericItemRotation(quint32 itemID, QVector3D rot);
     QVector3D genericItemsRotation() const;
     void setGenericItemsRotation(QVector3D rot);
-
-    /** Rotate every selected generic item by the provided $degrees */
-    Q_INVOKABLE void rotateGenericItems(QVector3D degrees);
 
     /** Set/Get the scale of the selected generic items, as a percentage. The
      *  setter is an absolute scale, so it applies only when a single item is

@@ -64,12 +64,9 @@ Rectangle
 
         if (selFixturesCount + selGenericCount > 1)
         {
-            lastPosition = Qt.vector3d(0, 0, 0)
-            lastRotation = Qt.vector3d(0, 0, 0)
-            lastScale = Qt.vector3d(100.0, 100.0, 100.0)
-            pos = lastPosition
-            rot = lastRotation
-            scl = lastScale
+            pos = Qt.vector3d(0, 0, 0)
+            rot = Qt.vector3d(0, 0, 0)
+            scl = Qt.vector3d(100.0, 100.0, 100.0)
         }
         else if (selGenericCount == 1)
         {
@@ -85,6 +82,9 @@ Rectangle
             scl = currentScale
         }
 
+        lastPosition = pos
+        lastRotation = rot
+        lastScale = scl
         currentPosition = pos
         currentRotation = rot
         currentScale = scl
@@ -383,24 +383,12 @@ Rectangle
                             if (isUpdating)
                                 return;
 
-                            if (selFixturesCount == 1 && selGenericCount == 0)
-                            {
-                                contextManager.fixturesPosition = Qt.vector3d(x, y, z)
-                            }
-                            else if (selFixturesCount == 0 && selGenericCount == 1)
-                            {
-                                View3D.genericItemsPosition = Qt.vector3d(x, y, z)
-                            }
-                            else
-                            {
-                                // more than one item is selected, so the fields hold an
-                                // offset from the neutral base they were reset to. Every
-                                // item moves by that much, whatever its type
-                                var newPos = Qt.vector3d(x - lastPosition.x, y - lastPosition.y, z - lastPosition.z)
-                                contextManager.moveFixtures(newPos)
-                                View3D.moveGenericItems(newPos)
-                                lastPosition = Qt.vector3d(x, y, z)
-                            }
+                            var newPos = Qt.vector3d(x - lastPosition.x, y - lastPosition.y, z - lastPosition.z)
+                            if (selFixturesCount > 0)
+                                contextManager.fixturesPosition = newPos
+                            if (selGenericCount > 0)
+                                View3D.genericItemsPosition = newPos
+                            lastPosition = Qt.vector3d(x, y, z)
                         }
 
                         // row 1
@@ -487,23 +475,12 @@ Rectangle
                             if (isUpdating)
                                 return;
 
-                            if (selFixturesCount == 1 && selGenericCount == 0)
-                            {
-                                contextManager.fixturesRotation = Qt.vector3d(x, y, z)
-                            }
-                            else if (selFixturesCount == 0 && selGenericCount == 1)
-                            {
-                                View3D.genericItemsRotation = Qt.vector3d(x, y, z)
-                            }
-                            else
-                            {
-                                // more than one item is selected: rotate each of them by
-                                // the offset entered, rather than setting an absolute angle
-                                var newRot = Qt.vector3d(x - lastRotation.x, y - lastRotation.y, z - lastRotation.z)
-                                contextManager.rotateFixtures(newRot)
-                                View3D.rotateGenericItems(newRot)
-                                lastRotation = Qt.vector3d(x, y, z)
-                            }
+                            var newRot = Qt.vector3d(x - lastRotation.x, y - lastRotation.y, z - lastRotation.z)
+                            if (selFixturesCount > 0)
+                                contextManager.fixturesRotation = newRot
+                            if (selGenericCount > 0)
+                                View3D.genericItemsRotation = newRot
+                            lastRotation = Qt.vector3d(x, y, z)
                         }
 
                         // row 1
