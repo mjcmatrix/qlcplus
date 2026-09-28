@@ -166,6 +166,7 @@ TreeModelItem *TreeModel::addItem(QString label, QVariantList data, QString path
                 connect(item->children(), SIGNAL(roleChanged(TreeModelItem*,int,const QVariant&)),
                         this, SLOT(slotRoleChanged(TreeModelItem*,int,const QVariant&)));
                 qDebug() << "Tree" << this << "connected to tree" << item->children();
+                notifyChildrenCreated(item);
             }
         }
         else
@@ -176,11 +177,24 @@ TreeModelItem *TreeModel::addItem(QString label, QVariantList data, QString path
                 connect(item->children(), SIGNAL(roleChanged(TreeModelItem*,int,const QVariant&)),
                         this, SLOT(slotRoleChanged(TreeModelItem*,int,const QVariant&)));
                 qDebug() << "Tree" << this << "connected to tree" << item->children();
+                notifyChildrenCreated(item);
             }
         }
     }
 
     return item;
+}
+
+void TreeModel::notifyChildrenCreated(TreeModelItem *item)
+{
+    /* An existing node (e.g. an empty folder) just got its children tree:
+     * views bound to its children model must pick up the new one */
+    int row = m_items.indexOf(item);
+    if (row == -1)
+        return;
+
+    QModelIndex mIndex = createIndex(row, 0);
+    emit dataChanged(mIndex, mIndex, QVector<int>() << ChildrenModel << HasChildrenRole);
 }
 
 TreeModelItem *TreeModel::itemAtPath(const QString& path, int type) const

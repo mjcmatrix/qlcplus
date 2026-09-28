@@ -157,6 +157,9 @@ protected:
     /** Return the index of the first level item with $label and $type, or -1 */
     int itemIndex(const QString& label, int type) const;
 
+    /** Notify views that $item, already in this tree, now has a children tree */
+    void notifyChildrenCreated(TreeModelItem *item);
+
 protected:
     QStringList m_roles;
     bool m_sorting;
