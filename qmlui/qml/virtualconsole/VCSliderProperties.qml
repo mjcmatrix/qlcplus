@@ -304,7 +304,17 @@ Rectangle
                         height: gridItemsHeight
                         Layout.fillWidth: true
                         labelColor: UISettings.selection
-                        label: (widgetRef.channelsCount === 0 ? qsTr("None") : widgetRef.channelsCount) + " " + qsTr("selected")
+                        // the count always comes first, so that it stays readable
+                        // when the channel names don't fit the available width
+                        label:
+                        {
+                            if (widgetRef.channelsCount === 0)
+                                return qsTr("None selected")
+
+                            return widgetRef.channelsCount + " " + qsTr("selected") + ": " +
+                                   widgetRef.channelsList.map(function(ch)
+                                   { return ch.fxName + " - " + ch.chName }).join(", ")
+                        }
                     }
                     IconButton
                     {
@@ -322,7 +332,7 @@ Rectangle
                                     rightSidePanel.width += UISettings.sidePanelWidth
                                 sideLoader.visible = true
                                 sideLoader.modelProvider = widgetRef
-                                sideLoader.source = "qrc:/FixtureGroupManager.qml"
+                                sideLoader.source = "qrc:/VCSliderChannelsPanel.qml"
                             }
                             else
                             {
