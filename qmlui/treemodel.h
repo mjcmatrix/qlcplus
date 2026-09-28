@@ -58,6 +58,15 @@ public:
         Draggable = (1 << 5)
     };
 
+    /** Restrict a lookup by path to a kind of item, since a leaf
+     *  and a node (e.g. a Function and a folder) can share a label */
+    enum ItemType
+    {
+        AnyItem,
+        LeafItem,
+        NodeItem
+    };
+
     TreeModel(QObject *parent = 0);
     ~TreeModel();
 
@@ -87,10 +96,12 @@ public:
      *  $flags are used to give an item a specific initial state. See TreeItemsFlags */
     TreeModelItem *addItem(QString label, QVariantList data, QString path = QString(), int flags = 0);
 
-    TreeModelItem *itemAtPath(const QString& path) const;
+    /** Return the item with the given $path. The last path element is matched
+     *  against items of the given $type. See ItemType */
+    TreeModelItem *itemAtPath(const QString& path, int type = AnyItem) const;
 
-    /** Remove an item with the given $path from the tree */
-    bool removeItem(const QString& path);
+    /** Remove an item with the given $path and $type from the tree */
+    bool removeItem(const QString& path, int type = AnyItem);
 
     /**
      * Set the value of an item role by item path. This is recursive.
@@ -98,8 +109,9 @@ public:
      * @param path the absolute path of an item within a tree/subtree
      * @param value the value to set
      * @param role the model data role for which value is provided
+     * @param type the kind of item the last path element refers to. See ItemType
      */
-    void setItemRoleData(QString path, const QVariant &value, int role = Qt::EditRole);
+    void setItemRoleData(QString path, const QVariant &value, int role = Qt::EditRole, int type = AnyItem);
 
     /**
      * Set the value of an item role by item reference. This is not recursive.
@@ -141,6 +153,9 @@ protected:
     QHash<int, QByteArray> roleNames() const override;
     int getItemInsertIndex(const QString& label, int flags = 0) const;
     int getNodeInsertIndex(const QString& label) const;
+
+    /** Return the index of the first level item with $label and $type, or -1 */
+    int itemIndex(const QString& label, int type) const;
 
 protected:
     QStringList m_roles;

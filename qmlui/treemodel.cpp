@@ -183,7 +183,7 @@ TreeModelItem *TreeModel::addItem(QString label, QVariantList data, QString path
     return item;
 }
 
-TreeModelItem *TreeModel::itemAtPath(const QString& path) const
+TreeModelItem *TreeModel::itemAtPath(const QString& path, int type) const
 {
     if (path.isEmpty())
         return nullptr;
@@ -192,26 +192,19 @@ TreeModelItem *TreeModel::itemAtPath(const QString& path) const
 
     if (pathList.count() == 1)
     {
-        int index = 0;
-        for (index = 0; index < m_items.count(); index++)
-        {
-            if (m_items.at(index)->label() == path)
-                return m_items.at(index);
-        }
-
-        if (index == m_items.count())
-            return nullptr;
+        int index = itemIndex(path, type);
+        return index == -1 ? nullptr : m_items.at(index);
     }
 
     TreeModelItem *item = m_itemsPathMap.value(pathList.at(0), nullptr);
-    if (item == nullptr)
+    if (item == nullptr || item->hasChildren() == false)
         return nullptr;
 
     QString subPath = path.mid(path.indexOf(TreeModel::separator()) + 1);
-    return item->children()->itemAtPath(subPath);
+    return item->children()->itemAtPath(subPath, type);
 }
 
-bool TreeModel::removeItem(const QString& path)
+bool TreeModel::removeItem(const QString& path, int type)
 {
     if (path.isEmpty())
         return false;
@@ -222,36 +215,34 @@ bool TreeModel::removeItem(const QString& path)
 
     if (pathList.count() == 1)
     {
-        int index = 0;
-        for (index = 0; index < m_items.count(); index++)
-        {
-            if (m_items.at(index)->label() == path)
-                break;
-        }
-
-        if (index == m_items.count())
+        int index = itemIndex(path, type);
+        if (index == -1)
             return false;
 
+        TreeModelItem *item = m_items.at(index);
+
         beginRemoveRows(QModelIndex(), index, index);
-        m_itemsPathMap.remove(path);
-        delete m_items.at(index);
+        // a leaf sharing its label with a node must not unmap the node
+        if (m_itemsPathMap.value(path, nullptr) == item)
+            m_itemsPathMap.remove(path);
         m_items.removeAt(index);
+        delete item;
         endRemoveRows();
     }
     else
     {
         TreeModelItem *item = m_itemsPathMap.value(pathList.at(0), nullptr);
-        if (item == nullptr)
+        if (item == nullptr || item->hasChildren() == false)
             return false;
 
         QString subPath = path.mid(path.indexOf(TreeModel::separator()) + 1);
-        item->children()->removeItem(subPath);
+        return item->children()->removeItem(subPath, type);
     }
 
     return true;
 }
 
-void TreeModel::setItemRoleData(QString path, const QVariant &value, int role)
+void TreeModel::setItemRoleData(QString path, const QVariant &value, int role, int type)
 {
     if (path.isEmpty())
         return;
@@ -262,27 +253,21 @@ void TreeModel::setItemRoleData(QString path, const QVariant &value, int role)
 
     if (pathList.count() == 1)
     {
-        int index = 0;
-        for (index = 0; index < m_items.count(); index++)
-        {
-            if (m_items.at(index)->label() == pathList.at(0))
-                break;
-        }
-
-        if (index == m_items.count())
+        int index = itemIndex(pathList.at(0), type);
+        if (index == -1)
             return;
 
-        QModelIndex mIndex = createIndex(index, 0, &index);
+        QModelIndex mIndex = createIndex(index, 0);
         setData(mIndex, value, role);
     }
     else
     {
         TreeModelItem *item = m_itemsPathMap.value(pathList.at(0), nullptr);
-        if (item == nullptr)
+        if (item == nullptr || item->hasChildren() == false)
             return;
 
         QString subPath = path.mid(path.indexOf(TreeModel::separator()) + 1);
-        item->children()->setItemRoleData(subPath, value, role);
+        item->children()->setItemRoleData(subPath, value, role, type);
     }
 }
 
@@ -295,7 +280,7 @@ void TreeModel::setItemRoleData(TreeModelItem *item, const QVariant &value, int 
     if (index == -1)
         return;
 
-    QModelIndex mIndex = createIndex(index, 0, &index);
+    QModelIndex mIndex = createIndex(index, 0);
     setData(mIndex, value, role);
 }
 
@@ -519,6 +504,23 @@ int TreeModel::getNodeInsertIndex(const QString& label) const
         }
     }
     return rowCount();
+}
+
+int TreeModel::itemIndex(const QString& label, int type) const
+{
+    for (int index = 0; index < m_items.count(); index++)
+    {
+        TreeModelItem *item = m_items.at(index);
+        if (item->label() != label)
+            continue;
+
+        bool isNode = item->hasChildren() || (item->flags() & EmptyNode);
+
+        if (type == AnyItem || (type == NodeItem) == isNode)
+            return index;
+    }
+
+    return -1;
 }
 
 QHash<int, QByteArray> TreeModel::roleNames() const
