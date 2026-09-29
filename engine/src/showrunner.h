@@ -129,6 +129,9 @@ private:
     /** Apply the track intensity of $sf to its Function $f */
     void requestTrackIntensity(ShowFunction *sf, Function *f);
 
+    /** Return true if $function is in the running queue for any item */
+    bool isQueued(Function *function) const;
+
 private:
     /** True while the Show is held, waiting for an output to start */
     bool m_outputHold = false;

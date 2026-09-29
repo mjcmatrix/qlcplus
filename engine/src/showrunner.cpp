@@ -93,11 +93,16 @@ ShowRunner::ShowRunner(const Doc* doc, quint32 showID, quint32 startTime)
         // get all the functions of the track and append them to the runner queue
         foreach (ShowFunction *sfunc, track->showFunctions())
         {
-            if (sfunc->startTime() + sfunc->duration(m_doc) <= startTime)
-                continue;
-
             Function *f = m_doc->function(sfunc->functionID());
             if (f == NULL)
+                continue;
+
+            // beat-based items are placed in "beats as ms" (unless a tempo
+            // map puts every item in ms), so they must be compared with the
+            // beat position, not with real milliseconds
+            bool inMs = f->tempoType() == Function::Time || m_tempoMapActive;
+            quint32 startPosition = inMs ? startTime : m_elapsedBeats;
+            if (sfunc->startTime() + sfunc->duration(m_doc) <= startPosition)
                 continue;
 
             // with a tempo map, every item is positioned in ms
@@ -241,11 +246,6 @@ void ShowRunner::write(MasterTimer *timer)
         return;
     }
 
-    // Phase 1. Check all the Functions that need to be started
-    // m_timeFunctions is ordered by startup time, so when we found an entry
-    // with start time greater than m_elapsed, this phase is over
-    bool startFunctionsDone = false;
-
     // A Show can freely mix time-based and beat-based Functions on its
     // tracks (e.g. a beat-synced Chaser next to a Time-based Audio track),
     // regardless of the Show's own timeline display type. So beat tracking
@@ -268,6 +268,36 @@ void ShowRunner::write(MasterTimer *timer)
             m_elapsedBeats += 1000;
         }
     }
+
+    // Phase 1. Check if we need to stop some running Functions.
+    // This is done before starting new ones, so that when an item ends
+    // exactly where another item of the same Function begins, the Function
+    // is stopped and started again (MasterTimer restarts it cleanly),
+    // instead of the start being ignored and the stop winning.
+    // It is done in reverse order for two reasons:
+    // 1- m_runningQueue is not ordered by stop time
+    // 2- to avoid messing up with indices when an entry is removed
+    for (int i = m_runningQueue.count() - 1; i >= 0; i--)
+    {
+        Function *func = m_runningQueue.at(i).first;
+        quint32 stopTime = m_runningQueue.at(i).second;
+        quint32 currTime = (func->tempoType() == Function::Time || m_tempoMapActive) ? m_elapsedTime : m_elapsedBeats;
+
+        // if we passed the function stop time
+        if (currTime >= stopTime)
+        {
+            // remove it from the running queue
+            m_runningQueue.removeAt(i);
+            // and stop it, unless another item still needs it running
+            if (isQueued(func) == false)
+                func->stop(functionParent());
+        }
+    }
+
+    // Phase 2. Check all the Functions that need to be started
+    // m_timeFunctions is ordered by startup time, so when we found an entry
+    // with start time greater than m_elapsed, this phase is over
+    bool startFunctionsDone = false;
 
     // check if there are time-based functions to start
     while (startFunctionsDone == false)
@@ -293,29 +323,27 @@ void ShowRunner::write(MasterTimer *timer)
         }
         if (m_elapsedTime >= funcStartTime)
         {
-            foreach (Track *track, m_show->tracks())
+            // The same Function can be used by more than one item, e.g. on
+            // overlapping items on different tracks. A Function can run only
+            // once, so if it is already running for another item it just
+            // keeps running, until the last of its items ends
+            if (isQueued(f) == false)
             {
-                if (track->showFunctions().contains(sf))
-                {
-                    int intOverrideId = f->requestAttributeOverride(Function::Intensity, m_intensityMap[track->id()]);
-                    //f->adjustAttribute(m_intensityMap[track->id()], Function::Intensity);
-                    sf->setIntensityOverrideId(intOverrideId);
-                    break;
-                }
-            }
+                requestTrackIntensity(sf, f);
 
-            if (m_tempoMapActive && (f->tempoType() == Function::Beats || f->type() == Function::CollectionType))
-            {
-                // run the Function beats on the tempo map, from the item start.
-                // A Collection hands the clock to its Beats tempo members
-                TempoMapClock clock(m_tempoMap, sf->startTime());
-                f->start(m_doc->masterTimer(), functionParent(), functionTimeOffset,
-                         Function::defaultSpeed(), Function::defaultSpeed(), Function::defaultSpeed(),
-                         Function::Original, &clock);
-            }
-            else
-            {
-                f->start(m_doc->masterTimer(), functionParent(), functionTimeOffset);
+                if (m_tempoMapActive && (f->tempoType() == Function::Beats || f->type() == Function::CollectionType))
+                {
+                    // run the Function beats on the tempo map, from the item start.
+                    // A Collection hands the clock to its Beats tempo members
+                    TempoMapClock clock(m_tempoMap, sf->startTime());
+                    f->start(m_doc->masterTimer(), functionParent(), functionTimeOffset,
+                             Function::defaultSpeed(), Function::defaultSpeed(), Function::defaultSpeed(),
+                             Function::Original, &clock);
+                }
+                else
+                {
+                    f->start(m_doc->masterTimer(), functionParent(), functionTimeOffset);
+                }
             }
             m_runningQueue.append(QPair<Function *, quint32>(f, sf->startTime() + sf->duration(m_doc)));
             m_currentTimeFunctionIndex++;
@@ -352,43 +380,17 @@ void ShowRunner::write(MasterTimer *timer)
         }
         if (m_elapsedBeats >= funcStartTime)
         {
-            foreach (Track *track, m_show->tracks())
+            // see the time-based items above
+            if (isQueued(f) == false)
             {
-                if (track->showFunctions().contains(sf))
-                {
-                    int intOverrideId = f->requestAttributeOverride(Function::Intensity, m_intensityMap[track->id()]);
-                    //f->adjustAttribute(m_intensityMap[track->id()], Function::Intensity);
-                    sf->setIntensityOverrideId(intOverrideId);
-                    break;
-                }
+                requestTrackIntensity(sf, f);
+                f->start(m_doc->masterTimer(), functionParent(), functionTimeOffset);
             }
-
-            f->start(m_doc->masterTimer(), functionParent(), functionTimeOffset);
             m_runningQueue.append(QPair<Function *, quint32>(f, sf->startTime() + sf->duration(m_doc)));
             m_currentBeatFunctionIndex++;
         }
         else
             startFunctionsDone = true;
-    }
-
-    // Phase 2. Check if we need to stop some running Functions
-    // It is done in reverse order for two reasons:
-    // 1- m_runningQueue is not ordered by stop time
-    // 2- to avoid messing up with indices when an entry is removed
-    for (int i = m_runningQueue.count() - 1; i >= 0; i--)
-    {
-        Function *func = m_runningQueue.at(i).first;
-        quint32 stopTime = m_runningQueue.at(i).second;
-        quint32 currTime = (func->tempoType() == Function::Time || m_tempoMapActive) ? m_elapsedTime : m_elapsedBeats;
-
-        // if we passed the function stop time
-        if (currTime >= stopTime)
-        {
-            // stop the function
-            func->stop(functionParent());
-            // remove it from the running queue
-            m_runningQueue.removeAt(i);
-        }
     }
 
     // Phase 3. Check if this is the end of the Show. A Show can mix
@@ -455,8 +457,11 @@ bool ShowRunner::startOutputHold()
             m_preStartedFunctions.contains(sf))
             continue;
 
-        requestTrackIntensity(sf, f);
-        f->start(m_doc->masterTimer(), functionParent(), m_elapsedTime - sf->startTime());
+        if (isQueued(f) == false)
+        {
+            requestTrackIntensity(sf, f);
+            f->start(m_doc->masterTimer(), functionParent(), m_elapsedTime - sf->startTime());
+        }
         m_runningQueue.append(QPair<Function *, quint32>(f, sf->startTime() + sf->duration(m_doc)));
         m_preStartedFunctions.insert(sf);
         started = true;
@@ -507,6 +512,17 @@ bool ShowRunner::isWaitingForOutput() const
     for (int i = 0; i < m_runningQueue.count(); i++)
     {
         if (m_runningQueue.at(i).first->isWaitingForOutput())
+            return true;
+    }
+
+    return false;
+}
+
+bool ShowRunner::isQueued(Function *function) const
+{
+    for (int i = 0; i < m_runningQueue.count(); i++)
+    {
+        if (m_runningQueue.at(i).first == function)
             return true;
     }
 
