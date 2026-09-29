@@ -68,6 +68,9 @@ private slots:
 
     void adjustIntensity();
     void adjustMasterIntensityAcrossRunningCrossfadeSteps();
+    void randomSingleStep();
+    void randomBackwardRound();
+    void randomOrderFollowsSteps();
 
     void tempoMapNoDrift();
     void tempoMapOffGridStart();
