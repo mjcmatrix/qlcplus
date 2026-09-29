@@ -55,6 +55,8 @@ private slots:
     void showPauseStop();
     void showStopRestart();
     void efxOutsideShow();
+    void vcEFXSectionBecomesActive();
+    void vcEFXShowPaused();
     void sharedEFXStartedOutsideFirst();
     void sharedEFXStartedByShowFirst();
     void efxInCollection();
@@ -62,12 +64,28 @@ private slots:
     void timeEFXInTempoShow();
     void fadeInOnTempoMap();
 
+    void liveSectionEdits();
+    void liveSectionEditsPaused();
+    void liveEFXItemAdded();
+    void liveEFXItemAddedPaused();
+    void liveEFXItemMovedInPlace();
+    void liveEFXItemMovedAhead();
+    void liveEFXItemResized();
+    void liveEFXDeleted();
+    void liveEFXDeletedPaused();
+    void liveEFXLoopEdited();
+    void liveEFXTempoTypeSwitched();
+
 private:
     EFX *createEFX(int fixtures, uint loopBeats);
     Show *createShow(const TempoMap &map);
     ShowFunction *addItem(Show *show, quint32 functionId, quint32 start, quint32 duration);
     void tick(int count = 1);
     bool tickUntil(EFX *efx, double time);
+    bool tickUntilStopped(Show *show);
+    bool tickUntilStoppedEFX(EFX *efx);
+    bool tickSmooth(EFX *efx, double bpm, double otherBpm = 0);
+    double gridOffset(EFX *efx, Show *show) const;
     quint32 showTime(Show *show) const;
 
     /** Run $show from $start until $efx stops or $maxTicks, checking on

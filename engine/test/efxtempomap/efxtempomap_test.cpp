@@ -172,6 +172,20 @@ bool EFXTempoMap_Test::tickUntil(EFX *efx, double time)
     return false;
 }
 
+bool EFXTempoMap_Test::tickUntilStopped(Show *show)
+{
+    for (int i = 0; i < 5000 && show->isRunning(); i++)
+        tick();
+    return show->isRunning() == false;
+}
+
+bool EFXTempoMap_Test::tickUntilStoppedEFX(EFX *efx)
+{
+    for (int i = 0; i < 5000 && efx->isRunning(); i++)
+        tick();
+    return efx->isRunning() == false;
+}
+
 quint32 EFXTempoMap_Test::showTime(Show *show) const
 {
     return show->m_runner == NULL ? 0 : show->m_runner->m_elapsedTime;
@@ -596,6 +610,35 @@ void EFXTempoMap_Test::showStopRestart()
     }, 600);
 }
 
+/* How far the whole beats of $efx are from the beat grid of $show */
+double EFXTempoMap_Test::gridOffset(EFX *efx, Show *show) const
+{
+    double offset = efx->m_beatPosition - show->tempoMap().gridPosition(showTime(show), 120);
+    double error = offset - std::floor(offset + 0.5);
+    if (qAbs(error) >= 0.001)
+        qDebug() << "grid offset" << error << "beats" << efx->m_beatPosition << "time" << showTime(show)
+                 << "grid" << show->tempoMap().gridPosition(showTime(show), 120) << "correction" << efx->m_beatCorrection
+                 << "last grid" << efx->m_showGridPosition;
+    return error;
+}
+
+/* Tick once and check that $efx moved on smoothly: forward, between half
+   and 1.5 times the tempo, $bpm (or anything between $bpm and $otherBpm) */
+bool EFXTempoMap_Test::tickSmooth(EFX *efx, double bpm, double otherBpm)
+{
+    double previous = efx->m_beatPosition;
+    tick();
+    double step = efx->m_beatPosition - previous;
+    double low = 0.5 * tickBeats(qMin(bpm, otherBpm > 0 ? otherBpm : bpm));
+    double high = 1.5 * tickBeats(qMax(bpm, otherBpm));
+    if (step < low - 1e-9 || step > high + 1e-9)
+    {
+        qDebug() << "step" << step << "out of" << low << high;
+        return false;
+    }
+    return true;
+}
+
 void EFXTempoMap_Test::efxOutsideShow()
 {
     TempoMap map;
@@ -606,25 +649,100 @@ void EFXTempoMap_Test::efxOutsideShow()
     addItem(show, showEFX->id(), 0, 10000);
 
     // another EFX started from a VC widget while the Show runs its tempo
-    // sections: it runs on the global BPM
+    // sections: the Show tempo takes over from the global BPM, and its
+    // whole beats lock onto the Show grid beats within a beat
+    EFX *vcEFX = createEFX(1, 4);
+    vcEFX->start(m_doc->masterTimer(), FunctionParent(FunctionParent::ManualVCWidget, 0));
+    tick(7);
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    tick();
+
+    for (int i = 0; i < 200; i++)
+    {
+        // locked within a beat (33 ticks)
+        QVERIFY(tickSmooth(vcEFX, 90, i > 35 ? 90 : 120));
+        QVERIFY(vcEFX->tempoMapClock().isNull());
+        QVERIFY(qAbs(showEFX->m_beatPosition - efxTime(showEFX) * 90 / 60000.0) < 1e-6);
+        if (i > 35)
+            QVERIFY(qAbs(gridOffset(vcEFX, show)) < 0.001);
+    }
+
+    // the Show stops: back to the global BPM, without a jump
+    show->stop(FunctionParent::master());
+    tick();
+    QVERIFY(vcEFX->isRunning());
+    QVERIFY(showEFX->isRunning() == false);
+    for (int i = 0; i < 50; i++)
+        QVERIFY(tickSmooth(vcEFX, 120));
+}
+
+void EFXTempoMap_Test::vcEFXSectionBecomesActive()
+{
+    // the Show plays at the global BPM up to its first section
+    TempoMap map;
+    map.addSection(TempoSection(3000, 30000, 75));
+    Show *show = createShow(map);
+    addItem(show, createEFX(1, 4)->id(), 0, 10000);
+
+    EFX *vcEFX = createEFX(1, 4);
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    tick();
+    vcEFX->start(m_doc->masterTimer(), FunctionParent(FunctionParent::ManualVCWidget, 0));
+
+    // before the section: the global BPM
+    while (showTime(show) < 3000)
+        QVERIFY(tickSmooth(vcEFX, 120));
+
+    // the section starts: 75 BPM from then, on its grid within a beat
+    for (int i = 0; i < 200; i++)
+    {
+        // locked within a beat (40 ticks)
+        bool locked = showTime(show) > 3000 + 800 + 20;
+        QVERIFY(tickSmooth(vcEFX, 75, locked ? 75 : 120));
+        if (locked)
+            QVERIFY(qAbs(gridOffset(vcEFX, show)) < 0.001);
+    }
+}
+
+void EFXTempoMap_Test::vcEFXShowPaused()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 30000, 100));
+    Show *show = createShow(map);
+    addItem(show, createEFX(1, 4)->id(), 0, 20000);
+
     EFX *vcEFX = createEFX(1, 4);
     show->start(m_doc->masterTimer(), FunctionParent::master());
     vcEFX->start(m_doc->masterTimer(), FunctionParent(FunctionParent::ManualVCWidget, 0));
+    tick(100);
+    QVERIFY(qAbs(gridOffset(vcEFX, show)) < 0.001);
 
-    tick(); // everything starts
-    for (int i = 2; i <= 200; i++)
+    // the Show paused: the EFX goes on at the section tempo
+    show->setPause(true);
+    for (int i = 0; i < 100; i++)
     {
+        double previous = vcEFX->m_beatPosition;
         tick();
-        QVERIFY(vcEFX->tempoMapClock().isNull());
-        QVERIFY(qAbs(vcEFX->m_beatPosition - i * tickBeats(120)) < 1e-6);
-        QVERIFY(qAbs(showEFX->m_beatPosition - efxTime(showEFX) * 90 / 60000.0) < 1e-6);
+        QVERIFY(qAbs(vcEFX->m_beatPosition - previous - tickBeats(100)) < 1e-6);
     }
 
-    // and it's not affected by the Show stopping
+    // resumed: it locks onto the grid again (now elsewhere) within a beat
+    // (30 ticks), smoothly
+    show->setPause(false);
+    for (int i = 0; i < 100; i++)
+    {
+        QVERIFY(tickSmooth(vcEFX, 100));
+        if (i > 31)
+            QVERIFY(qAbs(gridOffset(vcEFX, show)) < 0.001);
+    }
+
+    // paused, then stopped: back to the global BPM
+    show->setPause(true);
+    tick(10);
     show->stop(FunctionParent::master());
     tick(2);
-    QVERIFY(vcEFX->isRunning());
-    QVERIFY(showEFX->isRunning() == false);
+    for (int i = 0; i < 20; i++)
+        QVERIFY(tickSmooth(vcEFX, 120));
 }
 
 void EFXTempoMap_Test::sharedEFXStartedOutsideFirst()
@@ -635,23 +753,28 @@ void EFXTempoMap_Test::sharedEFXStartedOutsideFirst()
 
     EFX *efx = createEFX(1, 4);
     addItem(show, efx->id(), 2000, 2000);
+    addItem(show, createEFX(1, 4)->id(), 0, 6000);
 
-    // started from a VC widget first, then reached by the Show
+    // started from a VC widget first, then reached by the Show: it stays
+    // the VC widget EFX (no Show clock), following the Show tempo
     FunctionParent vc(FunctionParent::ManualVCWidget, 0);
     efx->start(m_doc->masterTimer(), vc);
     tick();
     show->start(m_doc->masterTimer(), FunctionParent::master());
 
-    // it keeps running on the global BPM, through and past the Show item
-    for (int i = 2; i <= 300; i++)
+    for (int i = 0; i < 250; i++)
     {
-        tick();
+        QVERIFY(tickSmooth(efx, 90, i > 35 ? 90 : 120));
         QVERIFY(efx->isRunning());
         QVERIFY(efx->tempoMapClock().isNull());
-        QVERIFY(qAbs(efx->m_beatPosition - i * tickBeats(120)) < 1e-6);
+        if (i > 35)
+            QVERIFY(qAbs(gridOffset(efx, show)) < 0.001);
     }
-    QVERIFY(show->isRunning() == false);
 
+    // past the Show end: the global BPM
+    QVERIFY(tickUntilStopped(show));
+    for (int i = 0; i < 20; i++)
+        QVERIFY(tickSmooth(efx, 120, 90));
     efx->stop(vc);
     tick(2);
     QVERIFY(efx->isRunning() == false);
@@ -768,6 +891,324 @@ void EFXTempoMap_Test::fadeInOnTempoMap()
     float x = 1, y = 1;
     efx->rotateAndScale(&x, &y);
     QVERIFY(qAbs(x - (127 + 127 * 0.5)) < 1.0);
+}
+
+/*********************************************************************
+ * Live edits
+ *********************************************************************/
+
+void EFXTempoMap_Test::liveSectionEdits()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 4000, 120));
+    map.addSection(TempoSection(4000, 30000, 90));
+    Show *show = createShow(map);
+
+    EFX *efx = createEFX(1, 4);
+    addItem(show, efx->id(), 1000, 14000);
+
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    QVERIFY(tickUntil(efx, 3000));
+
+    // the section boundary moved from 4000 to 5000 ms: still 120 BPM up
+    // to 5000, then 90 BPM on the new grid
+    TempoMap moved;
+    moved.addSection(TempoSection(0, 5000, 120));
+    moved.addSection(TempoSection(5000, 30000, 90));
+    show->setTempoMap(moved);
+    while (showTime(show) < 4900)
+        QVERIFY(tickSmooth(efx, 120));
+    while (showTime(show) < 6000)
+        QVERIFY(tickSmooth(efx, 90, 120));
+    QCOMPARE(efx->tempoMapClock()->map.sections(), moved.sections());
+    QCOMPARE(efx->tempoMapClock()->origin, quint32(1000));
+    for (int i = 0; i < 20; i++)
+    {
+        QVERIFY(tickSmooth(efx, 90));
+        QVERIFY(qAbs(gridOffset(efx, show)) < 0.02);
+    }
+
+    // the 90 BPM section deleted, off the 120 BPM grid: the gap goes on at
+    // 120 BPM, locked onto the grid of the first section within a beat
+    TempoMap deleted;
+    deleted.addSection(TempoSection(0, 5000, 120));
+    show->setTempoMap(deleted);
+    quint32 editTime = showTime(show);
+    while (showTime(show) < editTime + 700)
+        QVERIFY(tickSmooth(efx, 120, 90));
+    for (int i = 0; i < 20; i++)
+    {
+        QVERIFY(tickSmooth(efx, 120));
+        QVERIFY(qAbs(gridOffset(efx, show)) < 0.02);
+    }
+
+    // a section added ahead of the cursor, off the grid: taken over when
+    // reached, without a jump
+    TempoMap added;
+    added.addSection(TempoSection(0, 5000, 120));
+    added.addSection(TempoSection(9130, 30000, 150));
+    show->setTempoMap(added);
+    while (showTime(show) < 9100)
+        QVERIFY(tickSmooth(efx, 120));
+    while (showTime(show) < 9130 + 420)
+        QVERIFY(tickSmooth(efx, 150, 120));
+    for (int i = 0; i < 20; i++)
+    {
+        QVERIFY(tickSmooth(efx, 150));
+        QVERIFY(qAbs(gridOffset(efx, show)) < 0.02);
+    }
+}
+
+void EFXTempoMap_Test::liveSectionEditsPaused()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 30000, 120));
+    Show *show = createShow(map);
+
+    EFX *efx = createEFX(1, 4);
+    addItem(show, efx->id(), 1000, 14000);
+
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    QVERIFY(tickUntil(efx, 3010));
+
+    // edited while paused: nothing moves, the new tempo applies on resume
+    show->setPause(true);
+    tick();
+    double beats = efx->m_beatPosition;
+    TempoMap edited;
+    edited.addSection(TempoSection(0, 3000, 120));
+    edited.addSection(TempoSection(3000, 30000, 60));
+    show->setTempoMap(edited);
+    tick(30);
+    QCOMPARE(efx->m_beatPosition, beats);
+
+    show->setPause(false);
+    for (int i = 0; i < 100; i++)
+    {
+        QVERIFY(tickSmooth(efx, 60));
+        if (i > 55)
+            QVERIFY(qAbs(gridOffset(efx, show)) < 0.02);
+    }
+}
+
+void EFXTempoMap_Test::liveEFXItemAdded()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 30000, 120));
+    Show *show = createShow(map);
+    addItem(show, createEFX(1, 4)->id(), 0, 10000);
+
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    tick(100);
+
+    // an EFX item added under the cursor starts from where the cursor is
+    // in it, on the tempo map, as when a Show starts in the middle of it
+    EFX *efx = createEFX(1, 4);
+    addItem(show, efx->id(), 1000, 4000);
+    for (int i = 0; i < 50; i++)
+    {
+        tick();
+        QVERIFY(efx->isRunning());
+        QCOMPARE(efx->tempoMapClock()->origin, quint32(1000));
+        QVERIFY(qAbs(efx->m_beatPosition - (efxTime(efx) - 1000) / 500.0) < 1e-6);
+        QVERIFY(fixtureInStep(efx, efx->m_fixtures.at(0)));
+    }
+}
+
+void EFXTempoMap_Test::liveEFXItemAddedPaused()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 30000, 90));
+    Show *show = createShow(map);
+    addItem(show, createEFX(1, 4)->id(), 0, 10000);
+
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    tick(100);
+    show->setPause(true);
+    tick();
+
+    // added while paused: starts on resume, in step with the Show
+    EFX *efx = createEFX(1, 4);
+    addItem(show, efx->id(), 0, 5000);
+    tick(20);
+    QVERIFY(efx->isRunning() == false);
+
+    show->setPause(false);
+    tick();
+    QVERIFY(efx->isRunning());
+    for (int i = 0; i < 50; i++)
+    {
+        tick();
+        QVERIFY(qAbs(efxTime(efx) - showTime(show)) <= TICK);
+        QVERIFY(qAbs(efx->m_beatPosition - efxTime(efx) * 90 / 60000.0) < 1e-6);
+    }
+}
+
+void EFXTempoMap_Test::liveEFXItemMovedInPlace()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 30000, 120));
+    Show *show = createShow(map);
+
+    EFX *efx = createEFX(1, 4);
+    ShowFunction *sf = addItem(show, efx->id(), 1000, 7000);
+    addItem(show, createEFX(1, 4)->id(), 0, 12000);
+
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    QVERIFY(tickUntil(efx, 3000));
+
+    // moved, still under the cursor: the EFX goes on without a restart
+    // or a jump (its clock keeps the start it had) and stops at its new end
+    sf->setStartTime(1200);
+    for (int i = 0; i < 100; i++)
+    {
+        QVERIFY(tickSmooth(efx, 120));
+        QCOMPARE(efx->tempoMapClock()->origin, quint32(1000));
+    }
+    QVERIFY(tickUntilStoppedEFX(efx));
+    QVERIFY(qAbs(double(showTime(show)) - 8200) <= 2 * TICK);
+}
+
+void EFXTempoMap_Test::liveEFXItemMovedAhead()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 30000, 120));
+    Show *show = createShow(map);
+
+    EFX *efx = createEFX(1, 4);
+    ShowFunction *sf = addItem(show, efx->id(), 1000, 3000);
+    addItem(show, createEFX(1, 4)->id(), 0, 12000);
+
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    QVERIFY(tickUntil(efx, 2000));
+
+    // moved past the cursor: it stops, and starts again from its new start
+    sf->setStartTime(5000);
+    tick(2);
+    QVERIFY(efx->isRunning() == false);
+    QVERIFY(tickUntil(efx, 5020));
+    QCOMPARE(efx->tempoMapClock()->origin, quint32(5000));
+    QVERIFY(qAbs(efx->m_beatPosition - (efxTime(efx) - 5000) / 500.0) < 1e-6);
+}
+
+void EFXTempoMap_Test::liveEFXItemResized()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 30000, 120));
+    Show *show = createShow(map);
+
+    EFX *efx = createEFX(1, 4);
+    ShowFunction *sf = addItem(show, efx->id(), 1000, 3000);
+    addItem(show, createEFX(1, 4)->id(), 0, 12000);
+
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    QVERIFY(tickUntil(efx, 2000));
+
+    // longer: runs on to its new end, without a jump
+    sf->setDuration(6000);
+    while (showTime(show) < 6900)
+        QVERIFY(tickSmooth(efx, 120));
+    QVERIFY(tickUntilStoppedEFX(efx));
+    QVERIFY(qAbs(double(showTime(show)) - 7000) <= 2 * TICK);
+}
+
+void EFXTempoMap_Test::liveEFXDeleted()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 30000, 120));
+    Show *show = createShow(map);
+
+    EFX *efx = createEFX(1, 4);
+    addItem(show, efx->id(), 1000, 3000);
+    addItem(show, createEFX(1, 4)->id(), 0, 6000);
+
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    QVERIFY(tickUntil(efx, 2000));
+
+    // deleted as the Function Manager does: stopped, then deleted
+    quint32 id = efx->id();
+    efx->stop(FunctionParent::master());
+    tick();
+    QVERIFY(m_doc->deleteFunction(id));
+    QVERIFY(tickUntilStopped(show));
+}
+
+void EFXTempoMap_Test::liveEFXDeletedPaused()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 30000, 120));
+    Show *show = createShow(map);
+
+    EFX *efx = createEFX(1, 4);
+    addItem(show, efx->id(), 1000, 3000);
+    addItem(show, createEFX(1, 4)->id(), 0, 6000);
+
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    QVERIFY(tickUntil(efx, 2000));
+    show->setPause(true);
+    tick();
+
+    quint32 id = efx->id();
+    efx->stop(FunctionParent::master());
+    tick();
+    QVERIFY(m_doc->deleteFunction(id));
+    tick(5);
+
+    show->setPause(false);
+    show->setPause(true);
+    tick(2);
+    show->setPause(false);
+    QVERIFY(tickUntilStopped(show));
+}
+
+void EFXTempoMap_Test::liveEFXLoopEdited()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 30000, 120));
+    Show *show = createShow(map);
+
+    EFX *efx = createEFX(1, 4);
+    addItem(show, efx->id(), 1000, 8000);
+
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    QVERIFY(tickUntil(efx, 2330));
+
+    // the loop edited while running: the beat count goes on, and the
+    // fixture keeps its place in the loop
+    EFXFixture *ef = efx->m_fixtures.at(0);
+    float angle = ef->m_currentAngle;
+    efx->setDuration(2500);
+    QVERIFY(qAbs(ef->m_currentAngle - angle) < 0.01);
+    for (int i = 0; i < 100; i++)
+    {
+        QVERIFY(tickSmooth(efx, 120));
+        QVERIFY(ef->m_elapsed <= efx->loopDuration());
+    }
+}
+
+void EFXTempoMap_Test::liveEFXTempoTypeSwitched()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 30000, 120));
+    Show *show = createShow(map);
+
+    EFX *efx = createEFX(1, 4);
+    addItem(show, efx->id(), 1000, 8000);
+
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    QVERIFY(tickUntil(efx, 2000));
+
+    // switched to Time while running: carries on in ms
+    efx->setTempoType(Function::Time);
+    QCOMPARE(efx->duration(), uint(2000));
+    tick();
+    EFXFixture *ef = efx->m_fixtures.at(0);
+    for (int i = 0; i < 50; i++)
+    {
+        uint elapsed = ef->m_elapsed;
+        tick();
+        QVERIFY(ef->m_elapsed == elapsed + TICK || ef->m_elapsed == 0);
+    }
 }
 
 QTEST_GUILESS_MAIN(EFXTempoMap_Test)
