@@ -25,6 +25,7 @@
 #include "treemodelitem.h"
 #include "fixturemanager.h"
 #include "qlcfixturemode.h"
+#include "qlcchannel.h"
 #include "qlccapability.h"
 #include "fixtureutils.h"
 #include "genericfader.h"
@@ -92,6 +93,7 @@ VCSlider::VCSlider(Doc *doc, QObject *parent)
     , m_isOverriding(false)
     , m_fixtureTree(nullptr)
     , m_searchFilter(QString())
+    , m_channelTypeFilter(AllChannelTypes)
     , m_applyToSameType(false)
     , m_isUpdating(false)
     , m_clickAndGoType(CnGNone)
@@ -643,6 +645,323 @@ int VCSlider::channelsCount() const
     return m_levelChannels.count();
 }
 
+bool VCSlider::channelMatchesFilter(const QLCChannel *channel) const
+{
+    if (channel == nullptr)
+        return false;
+
+    switch (m_channelTypeFilter)
+    {
+        case DimmerChannelTypes:
+            return channel->group() == QLCChannel::Intensity &&
+                   channel->colour() == QLCChannel::NoColour;
+        case ColourChannelTypes:
+            return channel->group() == QLCChannel::Colour ||
+                   (channel->group() == QLCChannel::Intensity &&
+                    channel->colour() != QLCChannel::NoColour);
+        case PositionChannelTypes:
+            return channel->group() == QLCChannel::Pan ||
+                   channel->group() == QLCChannel::Tilt;
+        case BeamChannelTypes:
+            return channel->group() == QLCChannel::Beam ||
+                   channel->group() == QLCChannel::Gobo ||
+                   channel->group() == QLCChannel::Shutter ||
+                   channel->group() == QLCChannel::Prism ||
+                   channel->group() == QLCChannel::Effect;
+        default:
+            return true;
+    }
+}
+
+bool VCSlider::matchesSearch(const QString &fxName, const QLCChannel *channel) const
+{
+    if (m_searchFilter.isEmpty())
+        return true;
+
+    QString filter = m_searchFilter.toLower();
+
+    if (fxName.toLower().contains(filter))
+        return true;
+
+    return channel != nullptr && channel->name().toLower().contains(filter);
+}
+
+QVariantMap VCSlider::channelMap(Fixture *fixture, quint32 chIdx) const
+{
+    QVariantMap map;
+    const QLCChannel *channel = fixture->channel(chIdx);
+
+    map.insert("fxID", fixture->id());
+    map.insert("chIdx", chIdx);
+    map.insert("fxName", fixture->name());
+    map.insert("chName", channel != nullptr ? channel->name() : QString());
+    map.insert("chIcon", channel != nullptr ? channel->getIconNameFromGroup(channel->group(), true) : QString());
+    map.insert("dmxAddress", fixture->address() + chIdx + 1);
+    map.insert("universe", fixture->universe() + 1);
+
+    return map;
+}
+
+QVariantList VCSlider::channelsList()
+{
+    QVariantList list;
+
+    for (const SceneValue &scv : m_levelChannels)
+    {
+        Fixture *fixture = m_doc->fixture(scv.fxi);
+        if (fixture == nullptr)
+            continue;
+
+        list.append(channelMap(fixture, scv.channel));
+    }
+
+    return list;
+}
+
+QVariantList VCSlider::browserFixtures()
+{
+    QVariantList list;
+    QList<Fixture *> fixtures = m_doc->fixtures();
+
+    std::sort(fixtures.begin(), fixtures.end(), [](const Fixture *left, const Fixture *right)
+    {
+        if (left->universe() != right->universe())
+            return left->universe() < right->universe();
+        return left->address() < right->address();
+    });
+
+    for (Fixture *fixture : fixtures)
+    {
+        QLCFixtureMode *mode = fixture->fixtureMode();
+        if (mode == nullptr)
+            continue;
+
+        QVariantList matchIndices;
+        bool channelNameMatch = false;
+        quint32 chIdx = 0;
+
+        for (const QLCChannel *channel : mode->channels())
+        {
+            if (channelMatchesFilter(channel) && matchesSearch(fixture->name(), channel))
+            {
+                matchIndices.append(chIdx);
+                if (!m_searchFilter.isEmpty() &&
+                    channel->name().toLower().contains(m_searchFilter.toLower()))
+                    channelNameMatch = true;
+            }
+            chIdx++;
+        }
+
+        if (matchIndices.isEmpty())
+            continue;
+
+        QVariantMap map;
+        map.insert("fxID", fixture->id());
+        map.insert("fxName", fixture->name());
+        map.insert("fxIcon", fixture->iconResource(true));
+        map.insert("universe", fixture->universe() + 1);
+        map.insert("address", QString("%1-%2").arg(fixture->address() + 1)
+                                              .arg(fixture->address() + fixture->channels()));
+        map.insert("matchIndices", matchIndices);
+        map.insert("channelNameMatch", channelNameMatch);
+
+        list.append(map);
+    }
+
+    return list;
+}
+
+QVariantList VCSlider::browserChannels(quint32 fxID)
+{
+    QVariantList list;
+    Fixture *fixture = m_doc->fixture(fxID);
+    if (fixture == nullptr)
+        return list;
+
+    QLCFixtureMode *mode = fixture->fixtureMode();
+    if (mode == nullptr)
+        return list;
+
+    quint32 chIdx = 0;
+
+    for (const QLCChannel *channel : mode->channels())
+    {
+        if (channelMatchesFilter(channel) && matchesSearch(fixture->name(), channel))
+        {
+            QVariantMap map = channelMap(fixture, chIdx);
+            map.insert("isSelected", m_levelChannels.contains(SceneValue(fixture->id(), chIdx)));
+            list.append(map);
+        }
+        chIdx++;
+    }
+
+    return list;
+}
+
+void VCSlider::applySelectionToSameType(Fixture *sourceFixture, quint32 chIdx, bool selected)
+{
+    for (Fixture *fixture : m_doc->fixtures())
+    {
+        if (fixture->fixtureDef() != sourceFixture->fixtureDef() ||
+            fixture->fixtureMode() != sourceFixture->fixtureMode() ||
+            chIdx >= fixture->channels())
+            continue;
+
+        if (selected)
+            addLevelChannel(fixture->id(), chIdx);
+        else
+            removeLevelChannel(fixture->id(), chIdx);
+    }
+}
+
+void VCSlider::updateChannelSelection()
+{
+    std::sort(m_levelChannels.begin(), m_levelChannels.end());
+
+    // keep the (legacy) fixture tree in sync, if it was ever requested
+    if (m_fixtureTree != nullptr)
+    {
+        m_isUpdating = true;
+        FixtureManager::updateGroupsTree(m_doc, m_fixtureTree, m_searchFilter,
+                                         FixtureManager::ShowCheckBoxes | FixtureManager::ShowGroups | FixtureManager::ShowChannels,
+                                         m_levelChannels);
+        m_isUpdating = false;
+        emit groupsTreeModelChanged();
+    }
+
+    emit channelsCountChanged();
+    emit channelsListChanged();
+    // note: browserFixturesChanged is deliberately not emitted here. The browser
+    // list only depends on the filters, so reloading it on every channel
+    // add/remove would reset the fixtures scroll position
+
+    if (clickAndGoType() == CnGPreset)
+    {
+        updateClickAndGoResource();
+        emit clickAndGoPresetsListChanged();
+    }
+}
+
+void VCSlider::setChannelSelection(quint32 fxID, quint32 chIdx, bool selected)
+{
+    Fixture *fixture = m_doc->fixture(fxID);
+    if (fixture == nullptr)
+        return;
+
+    if (m_applyToSameType)
+    {
+        applySelectionToSameType(fixture, chIdx, selected);
+    }
+    else
+    {
+        if (selected)
+            addLevelChannel(fxID, chIdx);
+        else
+            removeLevelChannel(fxID, chIdx);
+    }
+
+    updateChannelSelection();
+}
+
+void VCSlider::setFixtureSelection(quint32 fxID, bool selected)
+{
+    Fixture *fixture = m_doc->fixture(fxID);
+    if (fixture == nullptr)
+        return;
+
+    QLCFixtureMode *mode = fixture->fixtureMode();
+    if (mode == nullptr)
+        return;
+
+    quint32 chIdx = 0;
+
+    for (const QLCChannel *channel : mode->channels())
+    {
+        if (channelMatchesFilter(channel) && matchesSearch(fixture->name(), channel))
+        {
+            if (m_applyToSameType)
+            {
+                applySelectionToSameType(fixture, chIdx, selected);
+            }
+            else
+            {
+                if (selected)
+                    addLevelChannel(fxID, chIdx);
+                else
+                    removeLevelChannel(fxID, chIdx);
+            }
+        }
+        chIdx++;
+    }
+
+    updateChannelSelection();
+}
+
+void VCSlider::addVisibleChannels()
+{
+    for (const QVariant &fxRef : browserFixtures())
+    {
+        quint32 fxID = fxRef.toMap().value("fxID").toUInt();
+        Fixture *fixture = m_doc->fixture(fxID);
+        if (fixture == nullptr)
+            continue;
+
+        QLCFixtureMode *mode = fixture->fixtureMode();
+        if (mode == nullptr)
+            continue;
+
+        quint32 chIdx = 0;
+
+        for (const QLCChannel *channel : mode->channels())
+        {
+            if (channelMatchesFilter(channel) && matchesSearch(fixture->name(), channel))
+                addLevelChannel(fxID, chIdx);
+            chIdx++;
+        }
+    }
+
+    updateChannelSelection();
+}
+
+void VCSlider::clearChannelSelection()
+{
+    if (m_levelChannels.isEmpty())
+        return;
+
+    clearLevelChannels();
+    updateChannelSelection();
+}
+
+int VCSlider::channelTypeFilter() const
+{
+    return m_channelTypeFilter;
+}
+
+void VCSlider::setChannelTypeFilter(int filter)
+{
+    if (m_channelTypeFilter == filter)
+        return;
+
+    m_channelTypeFilter = filter;
+
+    emit channelTypeFilterChanged();
+    emit browserFixturesChanged();
+}
+
+bool VCSlider::applySameType() const
+{
+    return m_applyToSameType;
+}
+
+void VCSlider::setApplySameType(bool enable)
+{
+    if (m_applyToSameType == enable)
+        return;
+
+    m_applyToSameType = enable;
+    emit applySameTypeChanged();
+}
+
 QString VCSlider::searchFilter() const
 {
     return m_searchFilter;
@@ -667,11 +986,12 @@ void VCSlider::setSearchFilter(QString searchFilter)
     }
 
     emit searchFilterChanged();
+    emit browserFixturesChanged();
 }
 
 void VCSlider::applyToSameType(bool enable)
 {
-    m_applyToSameType = enable;
+    setApplySameType(enable);
 }
 
 void VCSlider::removeActiveFaders()

@@ -29,6 +29,8 @@
 
 class FunctionParent;
 class GenericFader;
+class QLCChannel;
+class Fixture;
 
 class VCSlider : public VCWidget, public DMXSource
 {
@@ -63,6 +65,11 @@ class VCSlider : public VCWidget, public DMXSource
 
     Q_PROPERTY(QVariant groupsTreeModel READ groupsTreeModel NOTIFY groupsTreeModelChanged)
     Q_PROPERTY(QString searchFilter READ searchFilter WRITE setSearchFilter NOTIFY searchFilterChanged)
+
+    Q_PROPERTY(QVariantList channelsList READ channelsList NOTIFY channelsListChanged)
+    Q_PROPERTY(QVariantList browserFixtures READ browserFixtures NOTIFY browserFixturesChanged)
+    Q_PROPERTY(int channelTypeFilter READ channelTypeFilter WRITE setChannelTypeFilter NOTIFY channelTypeFilterChanged)
+    Q_PROPERTY(bool applySameType READ applySameType WRITE setApplySameType NOTIFY applySameTypeChanged)
 
     Q_PROPERTY(ClickAndGoType clickAndGoType READ clickAndGoType WRITE setClickAndGoType NOTIFY clickAndGoTypeChanged)
     Q_PROPERTY(QColor cngPrimaryColor READ cngPrimaryColor NOTIFY cngPrimaryColorChanged)
@@ -264,16 +271,73 @@ public:
 
     int channelsCount() const;
 
-    QVariant channelsList();
+    /** Channel type filters available in the channel selection panel */
+    enum ChannelTypeFilter
+    {
+        AllChannelTypes = 0,
+        DimmerChannelTypes,
+        ColourChannelTypes,
+        PositionChannelTypes,
+        BeamChannelTypes
+    };
+    Q_ENUM(ChannelTypeFilter)
+
+    /** Get the list of the currently controlled channels, as a
+     *  QML friendly list of maps (see channelMap) */
+    QVariantList channelsList();
+
+    /** Get the list of the fixtures matching the current search
+     *  filter and channel type filter */
+    QVariantList browserFixtures();
+
+    /** Get the channels of the given fixture matching the current
+     *  search filter and channel type filter */
+    Q_INVOKABLE QVariantList browserChannels(quint32 fxID);
+
+    /** Add/remove a single channel to/from the controlled channels */
+    Q_INVOKABLE void setChannelSelection(quint32 fxID, quint32 chIdx, bool selected);
+
+    /** Add/remove every currently visible channel of a fixture */
+    Q_INVOKABLE void setFixtureSelection(quint32 fxID, bool selected);
+
+    /** Add every channel currently visible in the browser */
+    Q_INVOKABLE void addVisibleChannels();
+
+    /** Remove every controlled channel */
+    Q_INVOKABLE void clearChannelSelection();
+
+    /** Get/Set the channel type filter of the channel selection panel */
+    int channelTypeFilter() const;
+    void setChannelTypeFilter(int filter);
 
     /** Get/Set a string to filter Group/Fixture/Channel names */
     QString searchFilter() const;
     void setSearchFilter(QString searchFilter);
 
+    /** Get/Set the flag to mirror a channel selection on every
+     *  fixture of the same type */
+    bool applySameType() const;
+    void setApplySameType(bool enable);
+
     Q_INVOKABLE void applyToSameType(bool enable);
 
 private:
     void removeActiveFaders();
+
+    /** Return true if the given channel matches the current channel type filter */
+    bool channelMatchesFilter(const QLCChannel *channel) const;
+
+    /** Return true if the given fixture/channel matches the current search filter */
+    bool matchesSearch(const QString &fxName, const QLCChannel *channel) const;
+
+    /** Build a QML friendly map describing a fixture channel */
+    QVariantMap channelMap(Fixture *fixture, quint32 chIdx) const;
+
+    /** Notify the QML layer that the channel selection changed */
+    void updateChannelSelection();
+
+    /** Add/remove a channel on every fixture sharing the source fixture type */
+    void applySelectionToSameType(Fixture *sourceFixture, quint32 chIdx, bool selected);
 
     /** Recursive method to check/uncheck channels for fixtures of the same type */
     void checkFixtureTree(TreeModel *tree, Fixture *sourceFixture, quint32 channelIndex, bool checked);
@@ -290,6 +354,12 @@ signals:
     /** Notify the listeners that the search filter has changed */
     void searchFilterChanged();
     void channelsCountChanged();
+    /** Notify the listeners that the controlled channels list has changed */
+    void channelsListChanged();
+    /** Notify the listeners that the browser fixtures list has changed */
+    void browserFixturesChanged();
+    void channelTypeFilterChanged();
+    void applySameTypeChanged();
 
 protected:
     QList <SceneValue> m_levelChannels;
@@ -305,6 +375,8 @@ protected:
     TreeModel *m_fixtureTree;
     /** A string to filter the displayed tree items */
     QString m_searchFilter;
+    /** The channel type currently displayed by the channel selection panel */
+    int m_channelTypeFilter;
 
     /** Flag to apply a channel selection to all
      *  the fixtures of the same type */
