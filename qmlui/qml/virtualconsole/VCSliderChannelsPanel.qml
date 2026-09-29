@@ -40,17 +40,28 @@ Rectangle
       * strings. Rebuilt whenever the slider channel list changes, so that
       * every check box in this panel can bind to it */
     property var selectedKeys: []
-    /** IDs of the fixtures expanded in the browser. Kept here (rather than in
-      * the delegates) so that expansion survives a browser model reload */
+    /** IDs of the fixtures expanded by the user in the browser. Kept here (rather
+      * than in the delegates) so that expansion survives a browser model reload */
     property var expandedIds: []
+    /** IDs of the fixtures expanded because the search filter matches one of
+      * their channel names. Rebuilt on every browser reload, so they collapse
+      * again when the search no longer matches them */
+    property var searchExpandedIds: []
+    /** The minimum height of the channel browser list */
+    readonly property real browserMinHeight: UISettings.listItemHeight * 6
 
-    onModelProviderChanged: updateSelectedKeys()
+    onModelProviderChanged:
+    {
+        updateSelectedKeys()
+        updateSearchExpanded()
+    }
 
     Connections
     {
         target: modelProvider
 
         function onChannelsListChanged() { panelRoot.updateSelectedKeys() }
+        function onBrowserFixturesChanged() { panelRoot.updateSearchExpanded() }
     }
 
     function channelKey(fxID, chIdx)
@@ -101,9 +112,24 @@ Rectangle
         return count
     }
 
+    function updateSearchExpanded()
+    {
+        var list = []
+
+        if (modelProvider)
+        {
+            var fixtures = modelProvider.browserFixtures
+            for (var i = 0; i < fixtures.length; i++)
+                if (fixtures[i].channelNameMatch)
+                    list.push(fixtures[i].fxID)
+        }
+
+        searchExpandedIds = list
+    }
+
     function isFixtureExpanded(fxID)
     {
-        return expandedIds.indexOf(fxID) !== -1
+        return expandedIds.indexOf(fxID) !== -1 || searchExpandedIds.indexOf(fxID) !== -1
     }
 
     function toggleFixtureExpanded(fxID)
@@ -111,16 +137,32 @@ Rectangle
         var list = expandedIds.slice()
         var idx = list.indexOf(fxID)
 
-        if (idx === -1)
-            list.push(fxID)
+        if (isFixtureExpanded(fxID))
+        {
+            // collapse, whatever expanded it
+            if (idx !== -1)
+                list.splice(idx, 1)
+
+            var searchList = searchExpandedIds.slice()
+            var searchIdx = searchList.indexOf(fxID)
+            if (searchIdx !== -1)
+            {
+                searchList.splice(searchIdx, 1)
+                searchExpandedIds = searchList
+            }
+        }
         else
-            list.splice(idx, 1)
+        {
+            list.push(fxID)
+        }
 
         expandedIds = list
     }
 
     function setAllFixturesExpanded(expand)
     {
+        searchExpandedIds = []
+
         var list = []
 
         if (expand && modelProvider)
@@ -179,8 +221,10 @@ Rectangle
         {
             Layout.fillWidth: true
             Layout.minimumHeight: UISettings.listItemHeight * 2
+            // grow with the content, but never squeeze the channel browser
+            // below browserMinHeight, so that it always remains usable
             Layout.preferredHeight: Math.min(selectedListView.contentHeight + 2,
-                                             panelRoot.height * 0.42)
+                                             panelRoot.height * 0.5)
             color: UISettings.bgStrong
             border.width: 1
             border.color: UISettings.bgLight
@@ -294,7 +338,7 @@ Rectangle
                     Layout.preferredWidth: UISettings.iconSizeMedium
                     faSource: FontAwesome.fa_angles_up
                     faColor: UISettings.fgMain
-                    enabled: panelRoot.expandedIds.length > 0
+                    enabled: panelRoot.expandedIds.length > 0 || panelRoot.searchExpandedIds.length > 0
                     tooltip: qsTr("Collapse all")
                     onClicked: panelRoot.setAllFixturesExpanded(false)
                 }
@@ -446,6 +490,7 @@ Rectangle
         {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.minimumHeight: panelRoot.browserMinHeight
             color: UISettings.bgStrong
             border.width: 1
             border.color: UISettings.bgLight

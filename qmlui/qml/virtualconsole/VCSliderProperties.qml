@@ -304,16 +304,19 @@ Rectangle
                         height: gridItemsHeight
                         Layout.fillWidth: true
                         labelColor: UISettings.selection
-                        // the count always comes first, so that it stays readable
-                        // when the channel names don't fit the available width
+                        // a single channel is named, several would not fit the width
                         label:
                         {
                             if (widgetRef.channelsCount === 0)
                                 return qsTr("None selected")
 
-                            return widgetRef.channelsCount + " " + qsTr("selected") + ": " +
-                                   widgetRef.channelsList.map(function(ch)
-                                   { return ch.fxName + " - " + ch.chName }).join(", ")
+                            if (widgetRef.channelsCount === 1)
+                            {
+                                var ch = widgetRef.channelsList[0]
+                                return ch.fxName + " - " + ch.chName
+                            }
+
+                            return widgetRef.channelsCount + " " + qsTr("selected")
                         }
                     }
                     IconButton

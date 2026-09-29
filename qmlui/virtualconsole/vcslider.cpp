@@ -737,12 +737,18 @@ QVariantList VCSlider::browserFixtures()
             continue;
 
         QVariantList matchIndices;
+        bool channelNameMatch = false;
         quint32 chIdx = 0;
 
         for (const QLCChannel *channel : mode->channels())
         {
             if (channelMatchesFilter(channel) && matchesSearch(fixture->name(), channel))
+            {
                 matchIndices.append(chIdx);
+                if (!m_searchFilter.isEmpty() &&
+                    channel->name().toLower().contains(m_searchFilter.toLower()))
+                    channelNameMatch = true;
+            }
             chIdx++;
         }
 
@@ -757,6 +763,7 @@ QVariantList VCSlider::browserFixtures()
         map.insert("address", QString("%1-%2").arg(fixture->address() + 1)
                                               .arg(fixture->address() + fixture->channels()));
         map.insert("matchIndices", matchIndices);
+        map.insert("channelNameMatch", channelNameMatch);
 
         list.append(map);
     }
