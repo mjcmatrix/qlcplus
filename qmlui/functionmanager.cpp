@@ -237,18 +237,17 @@ quint32 FunctionManager::addFunctiontoDoc(Function *func, QString name, bool sel
             }
         }
 
-        if (select)
-        {
-            QString treePath = func->path(true).replace("/", TreeModel::separator());
-            QString itemPath = treePath.isEmpty() ? func->name()
-                                : QString("%1%2%3").arg(treePath).arg(TreeModel::separator()).arg(func->name());
-            m_functionTree->setItemRoleData(itemPath, 1, TreeModel::IsSelectedRole);
-        }
-
         QQmlEngine::setObjectOwnership(func, QQmlEngine::CppOwnership);
 
         if (select)
         {
+            // the new Function replaces the current selection, as the tree shows
+            selectFunctionID(Function::invalidId(), false);
+
+            QString treePath = func->path(true).replace("/", TreeModel::separator());
+            QString itemPath = treePath.isEmpty() ? func->name()
+                                : QString("%1%2%3").arg(treePath).arg(TreeModel::separator()).arg(func->name());
+            m_functionTree->setItemRoleData(itemPath, 1, TreeModel::IsSelectedRole, TreeModel::LeafItem);
             m_selectedIDList.append(QVariant(func->id()));
             emit selectedFunctionCountChanged(m_selectedIDList.count());
         }
@@ -934,7 +933,7 @@ void FunctionManager::storeExpandedPaths()
 void FunctionManager::restoreExpandedPaths()
 {
     for (const QString &path : m_expandedPaths)
-        m_functionTree->setItemRoleData(path, true, TreeModel::IsExpandedRole);
+        m_functionTree->setItemRoleData(path, true, TreeModel::IsExpandedRole, TreeModel::NodeItem);
 }
 
 FunctionEditor *FunctionManager::currentEditor() const
@@ -986,7 +985,7 @@ void FunctionManager::deleteFunction(quint32 fid)
         fullPath = QString("%1%2%3").arg(funcPath).arg(TreeModel::separator()).arg(f->name());
     }
     m_doc->deleteFunction(f->id());
-    m_functionTree->removeItem(fullPath);
+    m_functionTree->removeItem(fullPath, TreeModel::LeafItem);
 }
 
 void FunctionManager::deleteFunctions(QVariantList IDList)
@@ -1021,14 +1020,14 @@ void FunctionManager::moveFunction(quint32 fID, QString newPath)
     QString fPath = f->path(true);
     if (fPath.isEmpty())
     {
-        m_functionTree->removeItem(f->name());
+        m_functionTree->removeItem(f->name(), TreeModel::LeafItem);
     }
     else
     {
         QString ftPath = fPath;
         QString itemPath = QString("%1%2%3").arg(ftPath.replace("/", TreeModel::separator()))
                                             .arg(TreeModel::separator()).arg(f->name());
-        m_functionTree->removeItem(itemPath);
+        m_functionTree->removeItem(itemPath, TreeModel::LeafItem);
     }
 
     Tardis::instance()->enqueueAction(Tardis::FunctionSetPath, f->id(), fPath, newPathSlashed);
@@ -1053,7 +1052,7 @@ void FunctionManager::moveFunctions(QString newPath)
 
     if ((movingFunctions || movingFolders) && m_emptyFolderList.contains(newPath))
     {
-        m_functionTree->removeItem(newPath);
+        m_functionTree->removeItem(newPath, TreeModel::NodeItem);
         m_emptyFolderList.removeAll(newPath);
         wasEmptyNode = true;
     }
@@ -1211,12 +1210,12 @@ bool FunctionManager::cloneFunctions(QString customName)
         TreeModel *model = m_functionTree;
         if (fPath.isEmpty() == false)
         {
-            TreeModelItem *node = m_functionTree->itemAtPath(fPath);
+            TreeModelItem *node = m_functionTree->itemAtPath(fPath, TreeModel::NodeItem);
             if (node == nullptr || node->hasChildren() == false)
                 continue;
             model = node->children();
         }
-        model->setItemRoleData(model->itemAtPath(f->name()), 2, TreeModel::IsSelectedRole);
+        model->setItemRoleData(model->itemAtPath(f->name(), TreeModel::LeafItem), 2, TreeModel::IsSelectedRole);
     }
 
     emitFunctionCounts();
@@ -1369,9 +1368,9 @@ void FunctionManager::setFolderPath(QString oldAbsPath, QString newPath, bool is
         newAbsPath = tokens.join(TreeModel::separator());
 
         // change the item label first
-        m_functionTree->setItemRoleData(oldAbsPath, tokens.last(), TreeModel::LabelRole);
+        m_functionTree->setItemRoleData(oldAbsPath, tokens.last(), TreeModel::LabelRole, TreeModel::NodeItem);
         // once label has changed, the item can now be accessed with the new path
-        m_functionTree->setItemRoleData(newAbsPath, tokens.last(), TreeModel::PathRole);
+        m_functionTree->setItemRoleData(newAbsPath, tokens.last(), TreeModel::PathRole, TreeModel::NodeItem);
     }
     else
     {
@@ -1431,7 +1430,7 @@ void FunctionManager::setFolderPath(QString oldAbsPath, QString newPath, bool is
 
     if (isRelative == false)
     {
-        m_functionTree->removeItem(oldAbsPath);
+        m_functionTree->removeItem(oldAbsPath, TreeModel::NodeItem);
 
         if (!movedEmptyFolders.isEmpty())
         {
@@ -1487,10 +1486,15 @@ bool FunctionManager::createFolder(QString folderName)
     if (m_emptyFolderList.contains(compPath))
         return false;
 
-    QString lowerPath = compPath.toLower();
+    // Function paths use '/' as separator, while folder paths in the tree
+    // use TreeModel::separator(). Match on a folder boundary, so that
+    // e.g. "Foo" is not taken by "Foobar"
+    QString slashedPath = QString(compPath).replace(TreeModel::separator(), '/');
     for (Function *f : m_doc->functions())
     {
-        if (f->path(true).toLower().startsWith(lowerPath))
+        QString funcPath = f->path(true);
+        if (funcPath.compare(slashedPath, Qt::CaseInsensitive) == 0 ||
+            funcPath.startsWith(slashedPath + '/', Qt::CaseInsensitive))
             return false;
     }
 
@@ -1532,18 +1536,18 @@ void FunctionManager::deleteSelectedFolders()
                 if (funcPath == slashedPath || funcPath.startsWith(slashedPath + '/'))
                     deleteFunction(func->id());
             }
-
-            // Empty subfolders nested under the deleted one are not backed by any
-            // function, so remove them from the empty folder list as well.
-            for (int i = m_emptyFolderList.count() - 1; i >= 0; i--)
-            {
-                const QString &emptyPath = m_emptyFolderList.at(i);
-                if (emptyPath.startsWith(path + TreeModel::separator()))
-                    m_emptyFolderList.removeAt(i);
-            }
         }
 
-        m_functionTree->removeItem(path);
+        // Empty subfolders nested under the deleted one are not backed by any
+        // function, so remove them from the empty folder list as well.
+        for (int i = m_emptyFolderList.count() - 1; i >= 0; i--)
+        {
+            const QString &emptyPath = m_emptyFolderList.at(i);
+            if (emptyPath.startsWith(path + TreeModel::separator()))
+                m_emptyFolderList.removeAt(i);
+        }
+
+        m_functionTree->removeItem(path, TreeModel::NodeItem);
     }
 
     m_selectedFolderList.clear();
@@ -2053,7 +2057,7 @@ void FunctionManager::slotFunctionNameChanged(quint32 fid)
     }
     else
     {
-        TreeModelItem *node = m_functionTree->itemAtPath(fPath);
+        TreeModelItem *node = m_functionTree->itemAtPath(fPath, TreeModel::NodeItem);
         if (node == nullptr || node->hasChildren() == false)
             return;
         items = node->children()->items();
@@ -2073,7 +2077,7 @@ void FunctionManager::slotFunctionNameChanged(quint32 fid)
         QString oldPath = fPath.isEmpty() ? item->label()
                                           : QString("%1%2%3").arg(fPath)
                                             .arg(TreeModel::separator()).arg(item->label());
-        if (m_functionTree->removeItem(oldPath) == false)
+        if (m_functionTree->removeItem(oldPath, TreeModel::LeafItem) == false)
             return;
 
         QVariantList params;
