@@ -35,6 +35,9 @@ RadioButton
     property color hoverColor: UISettings.bgLight
     property color pressColor: UISettings.highlightPressed
     property string tooltip: ""
+    /** Display a partial state indicator when not checked, for example
+      * when only some of the children of a tree node are checked */
+    property bool partiallyChecked: false
 
     Rectangle
     {
@@ -79,11 +82,11 @@ RadioButton
     indicator:
         Text
         {
-            visible: checked
+            visible: checked || partiallyChecked
             anchors.centerIn: parent
             color: "lime"
             font.family: UISettings.fontAwesomeFontName
             font.pixelSize: controlRoot.height * 0.80
-            text: FontAwesome.fa_check
+            text: checked ? FontAwesome.fa_check : FontAwesome.fa_minus
         }
 }

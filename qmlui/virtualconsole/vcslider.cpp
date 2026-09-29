@@ -736,22 +736,17 @@ QVariantList VCSlider::browserFixtures()
         if (mode == nullptr)
             continue;
 
-        int matchCount = 0;
-        int selectedCount = 0;
+        QVariantList matchIndices;
         quint32 chIdx = 0;
 
         for (const QLCChannel *channel : mode->channels())
         {
             if (channelMatchesFilter(channel) && matchesSearch(fixture->name(), channel))
-            {
-                matchCount++;
-                if (m_levelChannels.contains(SceneValue(fixture->id(), chIdx)))
-                    selectedCount++;
-            }
+                matchIndices.append(chIdx);
             chIdx++;
         }
 
-        if (matchCount == 0)
+        if (matchIndices.isEmpty())
             continue;
 
         QVariantMap map;
@@ -761,8 +756,7 @@ QVariantList VCSlider::browserFixtures()
         map.insert("universe", fixture->universe() + 1);
         map.insert("address", QString("%1-%2").arg(fixture->address() + 1)
                                               .arg(fixture->address() + fixture->channels()));
-        map.insert("matchCount", matchCount);
-        map.insert("selectedCount", selectedCount);
+        map.insert("matchIndices", matchIndices);
 
         list.append(map);
     }

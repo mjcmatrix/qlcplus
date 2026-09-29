@@ -89,6 +89,18 @@ Rectangle
         return count
     }
 
+    /** Return how many of the given channel indices of a fixture are selected */
+    function listedSelectedCount(fxID, chIndices)
+    {
+        var count = 0
+
+        for (var i = 0; i < chIndices.length; i++)
+            if (isChannelSelected(fxID, chIndices[i]))
+                count++
+
+        return count
+    }
+
     function isFixtureExpanded(fxID)
     {
         return expandedIds.indexOf(fxID) !== -1
@@ -103,6 +115,20 @@ Rectangle
             list.push(fxID)
         else
             list.splice(idx, 1)
+
+        expandedIds = list
+    }
+
+    function setAllFixturesExpanded(expand)
+    {
+        var list = []
+
+        if (expand && modelProvider)
+        {
+            var fixtures = modelProvider.browserFixtures
+            for (var i = 0; i < fixtures.length; i++)
+                list.push(fixtures[i].fxID)
+        }
 
         expandedIds = list
     }
@@ -238,11 +264,40 @@ Rectangle
             implicitHeight: UISettings.iconSizeMedium
             color: UISettings.bgMedium
 
-            RobotoText
+            RowLayout
             {
                 anchors.fill: parent
-                labelColor: UISettings.fgMain
-                label: qsTr("Add channels")
+                spacing: 2
+
+                RobotoText
+                {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    labelColor: UISettings.fgMain
+                    label: qsTr("Add channels")
+                }
+
+                IconButton
+                {
+                    Layout.preferredHeight: UISettings.iconSizeMedium
+                    Layout.preferredWidth: UISettings.iconSizeMedium
+                    faSource: FontAwesome.fa_angles_down
+                    faColor: UISettings.fgMain
+                    enabled: browserListView.count > 0
+                    tooltip: qsTr("Expand all")
+                    onClicked: panelRoot.setAllFixturesExpanded(true)
+                }
+
+                IconButton
+                {
+                    Layout.preferredHeight: UISettings.iconSizeMedium
+                    Layout.preferredWidth: UISettings.iconSizeMedium
+                    faSource: FontAwesome.fa_angles_up
+                    faColor: UISettings.fgMain
+                    enabled: panelRoot.expandedIds.length > 0
+                    tooltip: qsTr("Collapse all")
+                    onClicked: panelRoot.setAllFixturesExpanded(false)
+                }
             }
         }
 
@@ -421,7 +476,13 @@ Rectangle
 
                         required property var modelData
 
+                        /** Selected channels of this fixture, including the ones hidden by the filters */
                         readonly property int selectedCount: panelRoot.fixtureSelectedCount(modelData.fxID)
+                        /** Selected channels of this fixture, among the listed ones */
+                        readonly property int listedSelectedCount:
+                            panelRoot.listedSelectedCount(modelData.fxID, modelData.matchIndices)
+                        readonly property bool allListedSelected:
+                            listedSelectedCount === modelData.matchIndices.length
                         readonly property bool expanded: panelRoot.isFixtureExpanded(modelData.fxID)
 
                         // fixture row
@@ -458,14 +519,16 @@ Rectangle
                                 {
                                     implicitWidth: UISettings.listItemHeight
                                     implicitHeight: implicitWidth
-                                    checked: fxDelegate.selectedCount > 0
+                                    checked: fxDelegate.allListedSelected
+                                    partiallyChecked: fxDelegate.listedSelectedCount > 0
                                     tooltip: qsTr("Add/Remove all the listed channels of this fixture")
                                     onClicked:
                                     {
                                         // the click toggles 'checked': restore the binding
-                                        // and let the slider selection drive it again
-                                        var select = fxDelegate.selectedCount === 0
-                                        checked = Qt.binding(function() { return fxDelegate.selectedCount > 0 })
+                                        // and let the slider selection drive it again.
+                                        // A partial selection is completed rather than cleared
+                                        var select = !fxDelegate.allListedSelected
+                                        checked = Qt.binding(function() { return fxDelegate.allListedSelected })
 
                                         if (modelProvider)
                                             modelProvider.setFixtureSelection(fxDelegate.modelData.fxID, select)
