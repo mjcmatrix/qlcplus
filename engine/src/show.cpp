@@ -33,6 +33,7 @@
 #define KXMLQLCShowTimeDivision QStringLiteral("TimeDivision")
 #define KXMLQLCShowTimeType     QStringLiteral("Type")
 #define KXMLQLCShowTimeBPM      QStringLiteral("BPM")
+#define KXMLQLCShowMasterTempo  QStringLiteral("MasterTempo")
 
 /*****************************************************************************
  * Initialization
@@ -41,6 +42,7 @@
 Show::Show(Doc* doc) : Function(doc, Function::ShowType)
     , m_timeDivisionType(Time)
     , m_timeDivisionBPM(120)
+    , m_masterTempo(false)
     , m_itemsInMs(false)
     , m_latestTrackId(0)
     , m_latestShowFunctionID(0)
@@ -112,6 +114,7 @@ bool Show::copyFrom(const Function* function)
     m_timeDivisionBPM = show->m_timeDivisionBPM;
     m_tempoMap = show->m_tempoMap;
     m_itemsInMs = show->m_itemsInMs;
+    m_masterTempo = show->m_masterTempo;
     m_latestTrackId = show->m_latestTrackId;
     m_latestShowFunctionID = show->m_latestShowFunctionID;
 
@@ -219,6 +222,22 @@ void Show::setTempoMap(const TempoMap &tempoMap)
 
     emit tempoMapChanged();
     emit changed(id());
+}
+
+void Show::setMasterTempo(bool enable)
+{
+    if (enable == m_masterTempo)
+        return;
+
+    m_masterTempo = enable;
+
+    emit masterTempoChanged();
+    emit changed(id());
+}
+
+bool Show::masterTempo() const
+{
+    return m_masterTempo;
 }
 
 bool Show::itemsInMs() const
@@ -469,6 +488,8 @@ bool Show::saveXML(QXmlStreamWriter *doc) const
     doc->writeEndElement();
 
     saveXMLTempoMap(doc);
+    if (m_masterTempo)
+        doc->writeEmptyElement(KXMLQLCShowMasterTempo);
 
     foreach (Track *track, m_tracks)
         track->saveXML(doc);
@@ -506,6 +527,11 @@ bool Show::loadXML(QXmlStreamReader &root)
         else if (root.name() == KXMLQLCTempoMap)
         {
             loadXMLTempoMap(root);
+        }
+        else if (root.name() == KXMLQLCShowMasterTempo)
+        {
+            m_masterTempo = true;
+            root.skipCurrentElement();
         }
         else if (root.name() == KXMLQLCTrack)
         {

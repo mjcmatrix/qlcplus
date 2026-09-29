@@ -41,6 +41,7 @@ static bool compareShowFunctions(const ShowFunction *sf1, const ShowFunction *sf
 
 ShowRunner::ShowRunner(const Doc* doc, quint32 showID, quint32 startTime)
     : QObject(NULL)
+    , m_tempoOrder(0)
     , m_doc(doc)
     , m_currentTimeFunctionIndex(0)
     , m_elapsedTime(startTime)
@@ -415,10 +416,16 @@ void ShowRunner::publishTempo(MasterTimer *timer, bool paused)
     if (m_show == NULL)
         return;
 
-    if (m_tempoMapActive && m_tempoMap.isEmpty() == false)
-        timer->setShowTempo(m_show->id(), &m_tempoMap, m_elapsedTime, paused);
+    if (m_show->masterTempo() && m_tempoMapActive && m_tempoMap.isEmpty() == false)
+    {
+        if (m_tempoOrder == 0)
+            m_tempoOrder = timer->nextShowTempoOrder();
+        timer->setShowTempo(m_show->id(), m_tempoOrder, &m_tempoMap, m_elapsedTime, paused);
+    }
     else
+    {
         timer->clearShowTempo(m_show->id());
+    }
 }
 
 /************************************************************************

@@ -249,11 +249,15 @@ private:
      * Show tempo
      *************************************************************************/
 public:
-    /** A Show running with tempo sections publishes its tempo map and time
-     *  on every tick, so that the Beats tempo Functions it didn't start
-     *  (e.g. started from a VC widget) can follow its tempo too.
+    /** Get a number giving the start order of a Show setting the master
+     *  tempo: the Show started last takes over (see setShowTempo()) */
+    quint64 nextShowTempoOrder();
+
+    /** A Show set to set the master tempo publishes its tempo map and time
+     *  on every tick while it runs. Of several such Shows, the one with the
+     *  highest $order (started last) is followed.
      *  $tempoMap must stay valid until clearShowTempo() is called */
-    void setShowTempo(quint32 showId, const TempoMap *tempoMap, quint32 time, bool paused);
+    void setShowTempo(quint32 showId, quint64 order, const TempoMap *tempoMap, quint32 time, bool paused);
 
     /** Stop publishing the tempo of the Show with ID $showId */
     void clearShowTempo(quint32 showId);
@@ -262,15 +266,34 @@ public:
      *  time extrapolated to the current tick, and its paused state */
     const TempoMap *showTempo(double *time, bool *paused) const;
 
+    /** Returns true while a Show sets the master tempo: it plays (or is
+     *  paused) within its tempo sections, and the beat source is internal
+     *  or disabled. The BPM and the beats are then those of the Show */
+    bool showTempoActive() const;
+
+private:
+    /** Generate the beats and the BPM of the Show setting the master tempo
+     *  for this tick. Returns false if no Show sets it */
+    bool generateShowTempoBeat();
+
 private:
     /** The number of ticks since the MasterTimer was created */
     quint64 m_tickCount;
 
     quint32 m_showTempoId;
+    quint64 m_showTempoOrder;
+    quint64 m_showTempoCounter;
     const TempoMap *m_showTempoMap;
     quint32 m_showTempoTime;
     quint64 m_showTempoTick;
     bool m_showTempoPaused;
+
+    /** True while the Show tempo sets the BPM and the beats */
+    bool m_showTempoActive;
+    double m_showTempoBpm;
+    /** The Show grid position at the last tick, or -1 */
+    double m_showGridPosition;
+    bool m_showTempoWasPaused;
 };
 
 /** @} */

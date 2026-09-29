@@ -18,6 +18,8 @@
 */
 
 #include <QtTest>
+#include <QXmlStreamReader>
+#include <QXmlStreamWriter>
 #include <cmath>
 
 #define protected public
@@ -87,6 +89,7 @@ void EFXTempoMap_Test::cleanupTestCase()
 
 void EFXTempoMap_Test::init()
 {
+    m_doc->masterTimer()->setBeatSourceType(MasterTimer::None);
     m_doc->masterTimer()->requestBpmNumber(120);
 }
 
@@ -644,6 +647,7 @@ void EFXTempoMap_Test::efxOutsideShow()
     TempoMap map;
     map.addSection(TempoSection(0, 30000, 90));
     Show *show = createShow(map);
+    show->setMasterTempo(true);
 
     EFX *showEFX = createEFX(1, 4);
     addItem(show, showEFX->id(), 0, 10000);
@@ -682,6 +686,7 @@ void EFXTempoMap_Test::vcEFXSectionBecomesActive()
     TempoMap map;
     map.addSection(TempoSection(3000, 30000, 75));
     Show *show = createShow(map);
+    show->setMasterTempo(true);
     addItem(show, createEFX(1, 4)->id(), 0, 10000);
 
     EFX *vcEFX = createEFX(1, 4);
@@ -709,6 +714,7 @@ void EFXTempoMap_Test::vcEFXShowPaused()
     TempoMap map;
     map.addSection(TempoSection(0, 30000, 100));
     Show *show = createShow(map);
+    show->setMasterTempo(true);
     addItem(show, createEFX(1, 4)->id(), 0, 20000);
 
     EFX *vcEFX = createEFX(1, 4);
@@ -750,6 +756,7 @@ void EFXTempoMap_Test::sharedEFXStartedOutsideFirst()
     TempoMap map;
     map.addSection(TempoSection(0, 30000, 90));
     Show *show = createShow(map);
+    show->setMasterTempo(true);
 
     EFX *efx = createEFX(1, 4);
     addItem(show, efx->id(), 2000, 2000);
@@ -1209,6 +1216,247 @@ void EFXTempoMap_Test::liveEFXTempoTypeSwitched()
         tick();
         QVERIFY(ef->m_elapsed == elapsed + TICK || ef->m_elapsed == 0);
     }
+}
+
+/*********************************************************************
+ * Master tempo
+ *********************************************************************/
+
+/* The Show time at the tick being written (the runner has moved on) */
+static double tickTime(quint32 showTime)
+{
+    return double(showTime) - MasterTimer::tick();
+}
+
+void EFXTempoMap_Test::noMasterTempo()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 30000, 90));
+    Show *show = createShow(map);
+    addItem(show, createEFX(1, 4)->id(), 0, 10000);
+    QVERIFY(show->masterTempo() == false);
+
+    // a Show that doesn't set the master tempo leaves the other Beats
+    // tempo Functions on the global BPM
+    EFX *vcEFX = createEFX(1, 4);
+    QSignalSpy beats(m_doc->masterTimer(), SIGNAL(beat()));
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    vcEFX->start(m_doc->masterTimer(), FunctionParent(FunctionParent::ManualVCWidget, 0));
+    tick();
+    for (int i = 0; i < 100; i++)
+    {
+        QVERIFY(tickSmooth(vcEFX, 120));
+        QVERIFY(m_doc->masterTimer()->showTempoActive() == false);
+        QCOMPARE(m_doc->masterTimer()->bpmNumber(), 120);
+    }
+    QCOMPARE(beats.count(), 0);
+}
+
+void EFXTempoMap_Test::masterTempoExternalSource()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 30000, 90));
+    Show *show = createShow(map);
+    show->setMasterTempo(true);
+    addItem(show, createEFX(1, 4)->id(), 0, 10000);
+
+    // an external beat source (MIDI clock, audio) always wins
+    MasterTimer *timer = m_doc->masterTimer();
+    timer->setBeatSourceType(MasterTimer::External);
+    EFX *vcEFX = createEFX(1, 4);
+    show->start(timer, FunctionParent::master());
+    vcEFX->start(timer, FunctionParent(FunctionParent::ManualVCWidget, 0));
+    tick();
+    for (int i = 1; i <= 100; i++)
+    {
+        timer->m_beatRequested = (i % 25) == 0;
+        QVERIFY(tickSmooth(vcEFX, 120));
+        QVERIFY(timer->showTempoActive() == false);
+        QCOMPARE(timer->bpmNumber(), 120);
+    }
+}
+
+void EFXTempoMap_Test::masterTempoBeats()
+{
+    // with the beat generator disabled or internal, a Show setting the master
+    // tempo gives the BPM and the beats of its sections
+    for (MasterTimer::BeatsSourceType source : { MasterTimer::None, MasterTimer::Internal })
+    {
+        TempoMap map;
+        map.addSection(TempoSection(2000, 30000, 90));
+        Show *show = createShow(map);
+        show->setMasterTempo(true);
+        addItem(show, createEFX(1, 4)->id(), 0, 10000);
+
+        MasterTimer *timer = m_doc->masterTimer();
+        timer->setBeatSourceType(source);
+        QSignalSpy bpmChanges(timer, SIGNAL(bpmNumberChanged(int)));
+        QSignalSpy beats(timer, SIGNAL(beat()));
+        double beatMs = 60000.0 / 90;
+
+        show->start(timer, FunctionParent::master());
+        tick();
+
+        // before the first section: nothing changes
+        while (showTime(show) < 2000)
+        {
+            tick();
+            QVERIFY(timer->showTempoActive() == false);
+            QCOMPARE(timer->bpmNumber(), 120);
+        }
+        beats.clear();
+
+        // within the section: 90 BPM, and the beats on its grid only
+        int count = 0;
+        while (showTime(show) < 6000)
+        {
+            int before = beats.count();
+            tick();
+            QVERIFY(timer->showTempoActive());
+            QCOMPARE(timer->bpmNumber(), 90);
+            QCOMPARE(timer->beatTimeDuration(), 667);
+            if (beats.count() > before)
+            {
+                double sinceBeat = std::fmod(tickTime(showTime(show)) - 2000, beatMs);
+                QVERIFY(sinceBeat < MasterTimer::tick());
+                count++;
+            }
+        }
+        // grid beats at 2000, 2667, ..., 5333: 6 of them
+        QCOMPARE(count, 6);
+        QVERIFY(bpmChanges.count() >= 1);
+        QCOMPARE(bpmChanges.last().at(0).toInt(), 90);
+
+        // stopped: back to the global BPM
+        show->stop(FunctionParent::master());
+        tick(3);
+        QVERIFY(timer->showTempoActive() == false);
+        QCOMPARE(timer->bpmNumber(), 120);
+        QCOMPARE(bpmChanges.last().at(0).toInt(), 120);
+
+        m_doc->deleteFunction(show->id());
+    }
+}
+
+void EFXTempoMap_Test::masterTempoChaser()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 30000, 90));
+    Show *show = createShow(map);
+    show->setMasterTempo(true);
+    addItem(show, createEFX(1, 4)->id(), 0, 10000);
+
+    // a Beats tempo Chaser started from a VC widget, with 1 beat steps
+    Chaser *chaser = new Chaser(m_doc);
+    chaser->setTempoType(Function::Beats);
+    chaser->setDurationMode(Chaser::PerStep);
+    for (int i = 0; i < 4; i++)
+        chaser->addStep(ChaserStep(createEFX(1, 4)->id(), 0, 1000, 0));
+    m_doc->addFunction(chaser);
+
+    MasterTimer *timer = m_doc->masterTimer();
+    show->start(timer, FunctionParent::master());
+    tick(3);
+    chaser->start(timer, FunctionParent(FunctionParent::ManualVCWidget, 0));
+    tick();
+
+    // it steps on the Show beats: one step per beat at 90 BPM
+    QSignalSpy steps(chaser, SIGNAL(currentStepChanged(int)));
+    double beatMs = 60000.0 / 90;
+    while (showTime(show) < 6000)
+    {
+        int before = steps.count();
+        tick();
+        if (steps.count() > before)
+            QVERIFY(std::fmod(tickTime(showTime(show)), beatMs) < MasterTimer::tick());
+    }
+    QVERIFY(steps.count() >= 7 && steps.count() <= 9);
+}
+
+void EFXTempoMap_Test::twoMasterTempoShows()
+{
+    TempoMap map90;
+    map90.addSection(TempoSection(0, 60000, 90));
+    Show *show90 = createShow(map90);
+    show90->setMasterTempo(true);
+    addItem(show90, createEFX(1, 4)->id(), 0, 30000);
+
+    TempoMap map150;
+    map150.addSection(TempoSection(0, 60000, 150));
+    Show *show150 = createShow(map150);
+    show150->setMasterTempo(true);
+    addItem(show150, createEFX(1, 4)->id(), 0, 30000);
+
+    MasterTimer *timer = m_doc->masterTimer();
+    show90->start(timer, FunctionParent::master());
+    tick(5);
+    QCOMPARE(timer->bpmNumber(), 90);
+
+    // the Show started last sets the master tempo
+    show150->start(timer, FunctionParent::master());
+    tick(5);
+    QCOMPARE(timer->bpmNumber(), 150);
+
+    // and the other one takes over again when it stops
+    show150->stop(FunctionParent::master());
+    tick(5);
+    QCOMPARE(timer->bpmNumber(), 90);
+
+    show90->stop(FunctionParent::master());
+    tick(5);
+    QCOMPARE(timer->bpmNumber(), 120);
+}
+
+void EFXTempoMap_Test::masterTempoPaused()
+{
+    TempoMap map;
+    map.addSection(TempoSection(0, 30000, 90));
+    Show *show = createShow(map);
+    show->setMasterTempo(true);
+    addItem(show, createEFX(1, 4)->id(), 0, 20000);
+
+    MasterTimer *timer = m_doc->masterTimer();
+    show->start(timer, FunctionParent::master());
+    tick(50);
+
+    // paused: the Show keeps its tempo, and the beats go on at its BPM
+    show->setPause(true);
+    tick();
+    QSignalSpy beats(timer, SIGNAL(beat()));
+    tick(200); // 4 seconds: 6 beats at 90 BPM
+    QVERIFY(beats.count() >= 5 && beats.count() <= 7);
+    QCOMPARE(timer->bpmNumber(), 90);
+
+    show->setPause(false);
+    tick(10);
+    QVERIFY(timer->showTempoActive());
+    show->stop(FunctionParent::master());
+    tick(3);
+    QCOMPARE(timer->bpmNumber(), 120);
+}
+
+void EFXTempoMap_Test::masterTempoSaveLoad()
+{
+    Show *show = createShow(TempoMap());
+    show->setMasterTempo(true);
+
+    QBuffer buffer;
+    buffer.open(QIODevice::WriteOnly | QIODevice::Text);
+    QXmlStreamWriter xmlWriter(&buffer);
+    QVERIFY(show->saveXML(&xmlWriter));
+    xmlWriter.setDevice(NULL);
+    buffer.close();
+
+    buffer.open(QIODevice::ReadOnly | QIODevice::Text);
+    QXmlStreamReader xmlReader(&buffer);
+    xmlReader.readNextStartElement();
+    Show loaded(m_doc);
+    QVERIFY(loaded.loadXML(xmlReader));
+    QVERIFY(loaded.masterTempo());
+
+    // off by default, and not saved then
+    Show plain(m_doc);
+    QVERIFY(plain.masterTempo() == false);
 }
 
 QTEST_GUILESS_MAIN(EFXTempoMap_Test)

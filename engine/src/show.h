@@ -123,6 +123,13 @@ public:
      *  tempo Functions on its tempo map, whatever its time division */
     bool itemsInMs() const;
 
+    /** Set if the Show sets the master tempo while it plays within its tempo
+     *  sections: the global BPM and beats then follow its sections, for the
+     *  Beats tempo Functions it didn't start. Only when the beat generator is
+     *  internal or disabled: an external beat source always wins */
+    void setMasterTempo(bool enable);
+    bool masterTempo() const;
+
     /** Set the tempo map and the items unit as they are, without converting
      *  any item (used to restore a previous state, e.g. on undo) */
     void restoreTempoMap(const TempoMap &tempoMap, bool itemsInMs);
@@ -136,10 +143,12 @@ private:
 
 signals:
     void tempoMapChanged();
+    void masterTempoChanged();
 
 private:
     TempoMap m_tempoMap;
     mutable QMutex m_tempoMapMutex;
+    bool m_masterTempo;
     bool m_itemsInMs;
 
     /*********************************************************************

@@ -1257,12 +1257,13 @@ quint32 EFX::tempoElapsed() const
 
 uint EFX::advanceBeatClock(MasterTimer *timer)
 {
-    // a Show running (or paused) within its tempo sections takes over from
-    // the BPM, with its section tempo and beat grid
+    // a Show setting the master tempo, running (or paused) within its tempo
+    // sections, takes over from the BPM with its section tempo and beat
+    // grid, followed exactly rather than through the MasterTimer beats
     double showTime = 0;
     bool showPaused = false;
     const TempoMap *showMap = timer->showTempo(&showTime, &showPaused);
-    if (showMap != NULL && showMap->isBeforeSections(showTime) == false)
+    if (showMap != NULL && timer->showTempoActive())
         return advanceShowTempo(timer, *showMap, showTime, showPaused);
 
     m_showGridPosition = -1;

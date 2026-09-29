@@ -57,9 +57,14 @@ public:
 
     void write(MasterTimer *timer);
 
-    /** Publish the Show tempo on $timer, for the Beats tempo Functions the
-     *  Show didn't start (see MasterTimer::setShowTempo()) */
+    /** Publish the Show tempo on $timer when the Show sets the master
+     *  tempo (see Show::masterTempo() and MasterTimer::setShowTempo()) */
     void publishTempo(MasterTimer *timer, bool paused);
+
+private:
+    /** The start order of this run among the Shows setting the master
+     *  tempo, set when it first publishes its tempo */
+    quint64 m_tempoOrder;
 
 private:
     const Doc *m_doc;

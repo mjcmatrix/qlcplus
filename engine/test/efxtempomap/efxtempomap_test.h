@@ -76,6 +76,14 @@ private slots:
     void liveEFXLoopEdited();
     void liveEFXTempoTypeSwitched();
 
+    void noMasterTempo();
+    void masterTempoExternalSource();
+    void masterTempoBeats();
+    void masterTempoChaser();
+    void twoMasterTempoShows();
+    void masterTempoPaused();
+    void masterTempoSaveLoad();
+
 private:
     EFX *createEFX(int fixtures, uint loopBeats);
     Show *createShow(const TempoMap &map);
