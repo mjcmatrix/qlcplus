@@ -713,6 +713,15 @@ void Chaser::setPause(bool enable)
     Function::setPause(enable);
 }
 
+void Chaser::updateTempoMap(const TempoMap &tempoMap)
+{
+    Function::updateTempoMap(tempoMap);
+
+    QMutexLocker runnerLocker(&m_runnerMutex);
+    if (m_runner != NULL)
+        m_runner->updateTempoMap(tempoMap);
+}
+
 void Chaser::write(MasterTimer* timer, QList<Universe *> universes)
 {
     if (isPaused() && m_startupAction.m_action != ChaserPauseRequest)

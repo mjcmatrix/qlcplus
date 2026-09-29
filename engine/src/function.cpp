@@ -578,6 +578,14 @@ QSharedPointer<const TempoMapClock> Function::tempoMapClock() const
     return m_tempoMapClock;
 }
 
+void Function::updateTempoMap(const TempoMap &tempoMap)
+{
+    if (m_tempoMapClock.isNull())
+        return;
+
+    m_tempoMapClock = QSharedPointer<const TempoMapClock>(new TempoMapClock(tempoMap, m_tempoMapClock->origin));
+}
+
 Function::TempoType Function::overrideTempoType() const
 {
     return m_overrideTempoType;

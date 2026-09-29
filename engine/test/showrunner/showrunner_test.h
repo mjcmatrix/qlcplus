@@ -26,6 +26,8 @@ class Doc;
 class Show;
 class Track;
 class Scene;
+class Fixture;
+class ShowFunction;
 
 class ShowRunner_Test final : public QObject
 {
@@ -39,9 +41,45 @@ private slots:
     void stopRunner();
     void tempoMapRunner();
     void tempoMapCollection();
+    void sameFunctionConsecutiveItems();
+    void sameFunctionOverlappingItems();
+    void differentFunctionsConsecutiveItems();
+    void beatItemsWhenStartingMidway();
+
+    void liveAddItemAhead();
+    void liveAddItemUnderCursor();
+    void liveAddTrack();
+    void liveMovePendingItem();
+    void liveMoveRunningItemInPlace();
+    void liveMoveRunningItemAhead();
+    void liveMoveFinishedItemAhead();
+    void liveResizeRunningItem();
+    void liveExtendLastItem();
+    void liveDeleteRunningItem();
+    void liveDeletePendingItem();
+    void liveDeleteTrack();
+    void liveDeleteSharedItem();
+    void liveChangeItemFunction();
+    void liveDeleteRunningFunction();
+    void liveDeleteFunctionWhilePaused();
+    void liveEditsWhilePaused();
+    void liveMuteTrack();
+    void liveTempoMapEdit();
+    void liveFirstTempoSection();
+
+private:
+    Scene *createScene();
+    Show *createShow(quint32 fid1, quint32 start1, quint32 fid2, quint32 start2, bool sameTrack);
+    int runningTicks(Show *show, Scene *scene, quint32 from, quint32 to, quint32 until);
+    Show *createLiveShow();
+    ShowFunction *addLiveItem(Show *show, quint32 fid, quint32 start, quint32 duration, int track = 0);
+    bool tickTo(Show *show, quint32 time);
+    quint32 showTime(Show *show) const;
+    void stopShow(Show *show);
 
 private:
     Doc *m_doc;
+    Fixture *m_fixture;
     Show *m_show;
     Track *m_track;
     Scene *m_scene;

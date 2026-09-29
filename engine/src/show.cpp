@@ -198,6 +198,12 @@ const TempoMap &Show::tempoMap() const
     return m_tempoMap;
 }
 
+TempoMap Show::tempoMapSnapshot() const
+{
+    QMutexLocker locker(&m_tempoMapMutex);
+    return m_tempoMap;
+}
+
 void Show::setTempoMap(const TempoMap &tempoMap)
 {
     if (m_itemsInMs == false && tempoMap.isEmpty() == false)
@@ -206,7 +212,10 @@ void Show::setTempoMap(const TempoMap &tempoMap)
         m_itemsInMs = true;
     }
 
-    m_tempoMap = tempoMap;
+    {
+        QMutexLocker locker(&m_tempoMapMutex);
+        m_tempoMap = tempoMap;
+    }
 
     emit tempoMapChanged();
     emit changed(id());
@@ -219,7 +228,10 @@ bool Show::itemsInMs() const
 
 void Show::restoreTempoMap(const TempoMap &tempoMap, bool itemsInMs)
 {
-    m_tempoMap = tempoMap;
+    {
+        QMutexLocker locker(&m_tempoMapMutex);
+        m_tempoMap = tempoMap;
+    }
     m_itemsInMs = itemsInMs;
 
     emit tempoMapChanged();
