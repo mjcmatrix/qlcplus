@@ -2,7 +2,7 @@
   Q Light Controller Plus
   VCSliderChannelsPanel.qml
 
-  Copyright (c) Massimo Callegari
+  Copyright (c) Matt Carter (mjcmatrix)
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -130,7 +130,7 @@ Rectangle
                 RobotoText
                 {
                     Layout.fillWidth: true
-                    height: parent.height
+                    Layout.fillHeight: true
                     labelColor: UISettings.fgMain
                     label: qsTr("Controlled channels") +
                            " (" + (modelProvider ? modelProvider.channelsCount : 0) + ")"
@@ -138,8 +138,8 @@ Rectangle
 
                 IconButton
                 {
-                    height: UISettings.iconSizeMedium
-                    width: height
+                    Layout.preferredHeight: UISettings.iconSizeMedium
+                    Layout.preferredWidth: UISettings.iconSizeMedium
                     faSource: FontAwesome.fa_trash
                     faColor: UISettings.fgMain
                     enabled: modelProvider ? modelProvider.channelsCount > 0 : false
@@ -195,14 +195,14 @@ Rectangle
                             IconTextEntry
                             {
                                 Layout.fillWidth: true
-                                height: parent.height
+                                Layout.fillHeight: true
                                 iSrc: modelData.chIcon
                                 tLabel: modelData.fxName + " - " + modelData.chName
                             }
 
                             RobotoText
                             {
-                                height: parent.height
+                                Layout.fillHeight: true
                                 labelColor: UISettings.fgLight
                                 fontSize: UISettings.textSizeDefault * 0.8
                                 label: modelData.universe + "." + modelData.dmxAddress
@@ -210,8 +210,8 @@ Rectangle
 
                             IconButton
                             {
-                                height: UISettings.listItemHeight
-                                width: height
+                                Layout.preferredHeight: UISettings.listItemHeight
+                                Layout.preferredWidth: UISettings.listItemHeight
                                 faSource: FontAwesome.fa_minus
                                 faColor: UISettings.fgMain
                                 tooltip: qsTr("Remove this channel")
@@ -264,8 +264,8 @@ Rectangle
 
                 Text
                 {
-                    height: parent.height
-                    width: UISettings.iconSizeMedium
+                    Layout.fillHeight: true
+                    Layout.preferredWidth: UISettings.iconSizeMedium
                     color: UISettings.fgLight
                     font.family: UISettings.fontAwesomeFontName
                     font.pixelSize: UISettings.textSizeDefault
@@ -278,7 +278,7 @@ Rectangle
                 {
                     id: searchInput
                     Layout.fillWidth: true
-                    height: parent.height - 6
+                    Layout.fillHeight: true
                     color: UISettings.fgMain
                     text: modelProvider ? modelProvider.searchFilter : ""
                     font.family: UISettings.robotoFontName
@@ -300,8 +300,8 @@ Rectangle
 
                 IconButton
                 {
-                    height: UISettings.iconSizeMedium
-                    width: height
+                    Layout.preferredHeight: UISettings.iconSizeMedium
+                    Layout.preferredWidth: UISettings.iconSizeMedium
                     visible: searchInput.text.length > 0
                     faSource: FontAwesome.fa_xmark
                     faColor: UISettings.fgMain
@@ -320,6 +320,8 @@ Rectangle
         RowLayout
         {
             Layout.fillWidth: true
+            Layout.fillHeight: false
+            Layout.preferredHeight: UISettings.iconSizeMedium
             Layout.leftMargin: 2
             Layout.rightMargin: 2
             spacing: 2
@@ -340,7 +342,7 @@ Rectangle
                         required property var modelData
 
                         Layout.fillWidth: true
-                        height: UISettings.iconSizeMedium
+                        Layout.preferredHeight: UISettings.iconSizeMedium
                         fontSize: UISettings.textSizeDefault * 0.9
                         label: modelData.mLabel
                         bgColor: modelProvider && modelProvider.channelTypeFilter === modelData.mValue ?
@@ -353,6 +355,8 @@ Rectangle
         RowLayout
         {
             Layout.fillWidth: true
+            Layout.fillHeight: false
+            Layout.preferredHeight: UISettings.iconSizeMedium
             Layout.margins: 2
             spacing: 2
 
@@ -367,15 +371,15 @@ Rectangle
             RobotoText
             {
                 Layout.fillWidth: true
-                height: UISettings.listItemHeight
+                Layout.fillHeight: true
                 fontSize: UISettings.textSizeDefault * 0.9
                 label: qsTr("Apply to fixtures of the same type")
             }
 
             GenericButton
             {
-                height: UISettings.iconSizeMedium
-                width: UISettings.bigItemHeight
+                Layout.preferredHeight: UISettings.iconSizeMedium
+                Layout.preferredWidth: UISettings.bigItemHeight
                 fontSize: UISettings.textSizeDefault * 0.9
                 label: qsTr("Add all")
                 enabled: browserListView.count > 0
@@ -434,8 +438,8 @@ Rectangle
 
                                 Text
                                 {
-                                    height: parent.height
-                                    width: UISettings.listItemHeight
+                                    Layout.fillHeight: true
+                                    Layout.preferredWidth: UISettings.listItemHeight
                                     color: UISettings.fgMain
                                     font.family: UISettings.fontAwesomeFontName
                                     font.pixelSize: UISettings.textSizeDefault * 0.8
@@ -471,7 +475,7 @@ Rectangle
                                 IconTextEntry
                                 {
                                     Layout.fillWidth: true
-                                    height: parent.height
+                                    Layout.fillHeight: true
                                     iSrc: fxDelegate.modelData.fxIcon
                                     tLabel: fxDelegate.modelData.fxName
 
@@ -484,7 +488,7 @@ Rectangle
 
                                 RobotoText
                                 {
-                                    height: parent.height
+                                    Layout.fillHeight: true
                                     visible: fxDelegate.selectedCount > 0
                                     labelColor: UISettings.selection
                                     fontSize: UISettings.textSizeDefault * 0.8
@@ -493,7 +497,7 @@ Rectangle
 
                                 RobotoText
                                 {
-                                    height: parent.height
+                                    Layout.fillHeight: true
                                     labelColor: UISettings.fgLight
                                     fontSize: UISettings.textSizeDefault * 0.8
                                     label: fxDelegate.modelData.universe + "." + fxDelegate.modelData.address
@@ -545,14 +549,14 @@ Rectangle
                                         IconTextEntry
                                         {
                                             Layout.fillWidth: true
-                                            height: parent.height
+                                            Layout.fillHeight: true
                                             iSrc: modelData.chIcon
                                             tLabel: (modelData.chIdx + 1) + ": " + modelData.chName
                                         }
 
                                         RobotoText
                                         {
-                                            height: parent.height
+                                            Layout.fillHeight: true
                                             labelColor: UISettings.fgLight
                                             fontSize: UISettings.textSizeDefault * 0.8
                                             label: modelData.universe + "." + modelData.dmxAddress
