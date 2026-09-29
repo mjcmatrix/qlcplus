@@ -29,6 +29,7 @@
 #include <atomic>
 
 class MasterTimerPrivate;
+class TempoMap;
 class GenericFader;
 class FadeChannel;
 class DMXSource;
@@ -243,6 +244,33 @@ private:
     QElapsedTimer m_beatTimer;
     /** Time offset in milliseconds when the last beat occurred */
     int m_lastBeatOffset;
+
+    /*************************************************************************
+     * Show tempo
+     *************************************************************************/
+public:
+    /** A Show running with tempo sections publishes its tempo map and time
+     *  on every tick, so that the Beats tempo Functions it didn't start
+     *  (e.g. started from a VC widget) can follow its tempo too.
+     *  $tempoMap must stay valid until clearShowTempo() is called */
+    void setShowTempo(quint32 showId, const TempoMap *tempoMap, quint32 time, bool paused);
+
+    /** Stop publishing the tempo of the Show with ID $showId */
+    void clearShowTempo(quint32 showId);
+
+    /** Get the tempo map of the Show publishing its tempo, if any, with its
+     *  time extrapolated to the current tick, and its paused state */
+    const TempoMap *showTempo(double *time, bool *paused) const;
+
+private:
+    /** The number of ticks since the MasterTimer was created */
+    quint64 m_tickCount;
+
+    quint32 m_showTempoId;
+    const TempoMap *m_showTempoMap;
+    quint32 m_showTempoTime;
+    quint64 m_showTempoTick;
+    bool m_showTempoPaused;
 };
 
 /** @} */

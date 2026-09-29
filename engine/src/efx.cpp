@@ -53,6 +53,7 @@ EFX::EFX(Doc* doc)
     , m_beatUnits(0)
     , m_beatCorrection(0)
     , m_beatCorrectionRate(0)
+    , m_showGridPosition(-1)
 {
     updateRotationCache();
     setName(tr("New EFX"));
@@ -1192,6 +1193,7 @@ void EFX::preRun(MasterTimer* timer)
     m_beatUnits = 0;
     m_beatCorrection = 0;
     m_beatCorrectionRate = 0;
+    m_showGridPosition = -1;
 
     QSharedPointer<const TempoMapClock> clock = tempoMapClock();
     m_beatCursor = TempoMap::BeatCursor(clock.isNull() ? 0 : clock->origin);
@@ -1255,37 +1257,93 @@ quint32 EFX::tempoElapsed() const
 
 uint EFX::advanceBeatClock(MasterTimer *timer)
 {
+    // a Show running (or paused) within its tempo sections takes over from
+    // the BPM, with its section tempo and beat grid
+    double showTime = 0;
+    bool showPaused = false;
+    const TempoMap *showMap = timer->showTempo(&showTime, &showPaused);
+    if (showMap != NULL && showMap->isBeforeSections(showTime) == false)
+        return advanceShowTempo(timer, *showMap, showTime, showPaused);
+
+    m_showGridPosition = -1;
+
     int bpm = timer->bpmNumber();
     double beatDuration = 60000.0 / (bpm > 0 ? bpm : 120);
-    double step = MasterTimer::tick() / beatDuration;
 
-    // ease a pending phase correction in, over a beat
-    if (m_beatCorrection != 0)
-    {
-        double correction = m_beatCorrectionRate * step;
-        if (qAbs(correction) >= qAbs(m_beatCorrection))
-            correction = m_beatCorrection;
-        m_beatCorrection -= correction;
-        step += correction;
-    }
-
-    m_beatPosition += step;
+    m_beatPosition += easeBeatCorrection(MasterTimer::tick() / beatDuration);
 
     // On a beat, a whole beat of the EFX should be due too. Measure how far
     // off it is and correct it over the next beat, so the EFX locks onto the
-    // beats (also when started between two beats) without any jump. Errors
-    // within a tick are just the beat detection granularity
+    // beats (also when started between two beats) without any jump
+    // Errors within a tick are just the beat detection granularity
     if (timer->isBeat())
-    {
-        double error = m_beatPosition - floor(m_beatPosition + 0.5);
-        if (qAbs(error) * beatDuration > MasterTimer::tick())
-            m_beatCorrection = -error;
-        else
-            m_beatCorrection = 0;
-        m_beatCorrectionRate = m_beatCorrection;
-    }
+        lockOntoBeat(m_beatPosition - floor(m_beatPosition + 0.5), beatDuration, MasterTimer::tick());
 
     return updateBeatUnits();
+}
+
+uint EFX::advanceShowTempo(MasterTimer *timer, const TempoMap &tempoMap, double time, bool paused)
+{
+    double beatDuration = tempoMap.beatDurationAt(time, timer->bpmNumber());
+
+    m_beatPosition += easeBeatCorrection(MasterTimer::tick() / beatDuration);
+
+    // Lock the whole beats of the EFX onto the Show grid beats, when it
+    // starts following the Show or the Show resumes, and then on each grid
+    // beat (a section starts with a grid beat too). A paused Show keeps its
+    // tempo, but its grid doesn't move, so there is nothing to lock onto
+    if (paused)
+    {
+        m_showGridPosition = -1;
+        return updateBeatUnits();
+    }
+
+    double grid = tempoMap.gridPosition(time + MasterTimer::tick(), timer->bpmNumber());
+    bool gridBeat = m_showGridPosition < 0 || grid < m_showGridPosition ||
+                    floor(grid) > floor(m_showGridPosition);
+
+    if (gridBeat)
+    {
+        // the Show grid is exact, unlike detected beats
+        double offset = m_beatPosition - grid;
+        lockOntoBeat(offset - floor(offset + 0.5), beatDuration, 1.0);
+    }
+    m_showGridPosition = grid;
+
+    return updateBeatUnits();
+}
+
+double EFX::easeBeatCorrection(double step)
+{
+    if (m_beatCorrection == 0)
+        return step;
+
+    // ease a pending phase correction in, over a beat
+    double correction = m_beatCorrectionRate * step;
+    if (qAbs(correction) >= qAbs(m_beatCorrection))
+        correction = m_beatCorrection;
+    m_beatCorrection -= correction;
+
+    return step + correction;
+}
+
+void EFX::lockOntoBeat(double error, double beatDuration, double tolerance)
+{
+    // a correction still under way may already take care of the error
+    double residual = error + m_beatCorrection;
+    if (qAbs(residual) * beatDuration <= tolerance)
+        return;
+
+    m_beatCorrection = -error;
+    m_beatCorrectionRate = m_beatCorrection;
+}
+
+void EFX::updateTempoMap(const TempoMap &tempoMap)
+{
+    Function::updateTempoMap(tempoMap);
+
+    // carry on from the current beat count, eased onto the new beat grid
+    m_beatCursor.inSegment = false;
 }
 
 uint EFX::advanceTempoMapClock(MasterTimer *timer)

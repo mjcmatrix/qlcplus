@@ -57,6 +57,10 @@ public:
 
     void write(MasterTimer *timer);
 
+    /** Publish the Show tempo on $timer, for the Beats tempo Functions the
+     *  Show didn't start (see MasterTimer::setShowTempo()) */
+    void publishTempo(MasterTimer *timer, bool paused);
+
 private:
     const Doc *m_doc;
 

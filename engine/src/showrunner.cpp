@@ -96,6 +96,8 @@ ShowRunner::ShowRunner(const Doc* doc, quint32 showID, quint32 startTime)
 
 ShowRunner::~ShowRunner()
 {
+    if (m_show != NULL)
+        m_doc->masterTimer()->clearShowTempo(m_show->id());
 }
 
 void ShowRunner::start()
@@ -170,6 +172,8 @@ void ShowRunner::stop()
     }
 
     m_runningQueue.clear();
+    if (m_show != NULL)
+        m_doc->masterTimer()->clearShowTempo(m_show->id());
     m_startedItems.clear();
     m_itemsSynced = false;
     m_outputHold = false;
@@ -189,6 +193,7 @@ void ShowRunner::write(MasterTimer *timer)
 
     // Phase -1. Follow the edits made to the Show since the last tick
     syncItems();
+    publishTempo(timer, m_outputHold);
 
     // Phase 0. An Audio doesn't sound the moment it's started, so the Show
     // timeline (and every other item on it) waits for it to be heard,
@@ -403,6 +408,17 @@ void ShowRunner::write(MasterTimer *timer)
     {
         emit timeChanged(m_syncBeatsTime + (m_elapsedTime - m_syncElapsedTime));
     }
+}
+
+void ShowRunner::publishTempo(MasterTimer *timer, bool paused)
+{
+    if (m_show == NULL)
+        return;
+
+    if (m_tempoMapActive && m_tempoMap.isEmpty() == false)
+        timer->setShowTempo(m_show->id(), &m_tempoMap, m_elapsedTime, paused);
+    else
+        timer->clearShowTempo(m_show->id());
 }
 
 /************************************************************************

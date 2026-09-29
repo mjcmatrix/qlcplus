@@ -135,6 +135,15 @@ public:
      *  the first section */
     double beatDurationAt(double time, double fallbackBpm) const;
 
+    /** Get the position of $time on the beat grid it falls in, in beats
+     *  from the start of the grid (the section start, or 0 before the
+     *  first section) */
+    double gridPosition(double time, double fallbackBpm) const;
+
+    /** Returns true if $time is before the first section (or there are no
+     *  sections), where the fallback BPM applies */
+    bool isBeforeSections(double time) const;
+
     /**
      * Get the time (in ms) when a step of $beats beats, started at
      * $startTime, ends.

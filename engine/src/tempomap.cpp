@@ -280,6 +280,17 @@ double TempoMap::beatDurationAt(double time, double fallbackBpm) const
     return 60000.0 / segmentAt(time, fallbackBpm).bpm;
 }
 
+double TempoMap::gridPosition(double time, double fallbackBpm) const
+{
+    Segment segment = segmentAt(time, fallbackBpm);
+    return (time - segment.origin) * segment.bpm / 60000.0;
+}
+
+bool TempoMap::isBeforeSections(double time) const
+{
+    return m_sections.isEmpty() || time < m_sections.first().startTime;
+}
+
 double TempoMap::stepEnd(double startTime, double beats, double fallbackBpm) const
 {
     if (beats <= 0)

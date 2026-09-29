@@ -595,7 +595,11 @@ void Show::write(MasterTimer* timer, QList<Universe *> universes)
     Q_UNUSED(universes);
 
     if (isPaused())
+    {
+        // a paused Show keeps its tempo for the Functions following it
+        m_runner->publishTempo(timer, true);
         return;
+    }
 
     m_runner->write(timer);
 }

@@ -66,6 +66,12 @@ MasterTimer::MasterTimer(Doc* doc)
     , m_beatTimeDuration(500)
     , m_beatRequested(false)
     , m_lastBeatOffset(0)
+    , m_tickCount(0)
+    , m_showTempoId(Function::invalidId())
+    , m_showTempoMap(NULL)
+    , m_showTempoTime(0)
+    , m_showTempoTick(0)
+    , m_showTempoPaused(false)
 {
     Q_ASSERT(doc != NULL);
     Q_ASSERT(d_ptr != NULL);
@@ -155,6 +161,7 @@ void MasterTimer::timerTick()
     doc->inputOutputMap()->releaseUniverses();
 
     m_beatRequested = false;
+    m_tickCount++;
 
     //qDebug() << ">>>>>>>> MASTERTIMER TICK";
     emit tickReady();
@@ -431,4 +438,45 @@ void MasterTimer::requestBeat()
     // forceful request of a beat, processed at
     // the next timerTick call
     m_beatRequested = true;
+}
+
+/*************************************************************************
+ * Show tempo
+ *************************************************************************/
+
+void MasterTimer::setShowTempo(quint32 showId, const TempoMap *tempoMap, quint32 time, bool paused)
+{
+    m_showTempoId = showId;
+    m_showTempoMap = tempoMap;
+    m_showTempoTime = time;
+    m_showTempoTick = m_tickCount;
+    m_showTempoPaused = paused;
+}
+
+void MasterTimer::clearShowTempo(quint32 showId)
+{
+    if (showId != m_showTempoId)
+        return;
+
+    m_showTempoId = Function::invalidId();
+    m_showTempoMap = NULL;
+}
+
+const TempoMap *MasterTimer::showTempo(double *time, bool *paused) const
+{
+    if (m_showTempoMap == NULL)
+        return NULL;
+
+    // the Show may run after the caller in this tick, or have stopped
+    // publishing (e.g. paused) since
+    double elapsed = m_showTempoTime;
+    if (m_showTempoPaused == false)
+        elapsed += double(m_tickCount - m_showTempoTick) * tick();
+
+    if (time != NULL)
+        *time = elapsed;
+    if (paused != NULL)
+        *paused = m_showTempoPaused;
+
+    return m_showTempoMap;
 }
