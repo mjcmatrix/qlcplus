@@ -954,13 +954,17 @@ Rectangle
 
         Row
         {
+            id: tempoLaneButtons
             x: 2
             height: parent.height
             spacing: 2
 
+            // six buttons in the track header width
+            property real buttonSize: Math.min(height - 2, (trackWidth - 2) / 6 - spacing)
+
             IconButton
             {
-                width: parent.height - 2
+                width: tempoLaneButtons.buttonSize
                 height: width
                 anchors.verticalCenter: parent.verticalCenter
                 faSource: FontAwesome.fa_plus
@@ -971,7 +975,7 @@ Rectangle
 
             IconButton
             {
-                width: parent.height - 2
+                width: tempoLaneButtons.buttonSize
                 height: width
                 anchors.verticalCenter: parent.verticalCenter
                 faSource: FontAwesome.fa_music
@@ -982,7 +986,7 @@ Rectangle
 
             IconButton
             {
-                width: parent.height - 2
+                width: tempoLaneButtons.buttonSize
                 height: width
                 anchors.verticalCenter: parent.verticalCenter
                 faSource: FontAwesome.fa_pen
@@ -994,7 +998,7 @@ Rectangle
 
             IconButton
             {
-                width: parent.height - 2
+                width: tempoLaneButtons.buttonSize
                 height: width
                 anchors.verticalCenter: parent.verticalCenter
                 faSource: FontAwesome.fa_scissors
@@ -1006,7 +1010,7 @@ Rectangle
 
             IconButton
             {
-                width: parent.height - 2
+                width: tempoLaneButtons.buttonSize
                 height: width
                 anchors.verticalCenter: parent.verticalCenter
                 faSource: FontAwesome.fa_trash_can
@@ -1054,6 +1058,29 @@ Rectangle
                         close()
                     }
                     onAccepted: deleteAll()
+                }
+            }
+
+            IconButton
+            {
+                id: masterTempoButton
+                width: tempoLaneButtons.buttonSize
+                height: width
+                anchors.verticalCenter: parent.verticalCenter
+                faSource: FontAwesome.fa_tower_broadcast
+                faColor: UISettings.fgMain
+                checkable: true
+                checked: showManager.masterTempo
+                tooltip: qsTr("Set the master tempo while playing: Beats tempo functions started elsewhere " +
+                              "(e.g. from the Virtual Console) follow the tempo sections of this Show.\n" +
+                              "Only with the internal beat generator, or none: an external beat source always wins")
+                onToggled: showManager.masterTempo = checked
+
+                // a click breaks the binding above: follow another Show too
+                Connections
+                {
+                    target: showManager
+                    function onMasterTempoChanged() { masterTempoButton.checked = showManager.masterTempo }
                 }
             }
         }

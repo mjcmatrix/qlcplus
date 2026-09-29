@@ -78,6 +78,7 @@ class ShowManager final : public PreviewContext
 
     Q_PROPERTY(QVariantList tempoSections READ tempoSections NOTIFY tempoSectionsChanged)
     Q_PROPERTY(bool itemsInMs READ itemsInMs NOTIFY tempoSectionsChanged)
+    Q_PROPERTY(bool masterTempo READ masterTempo WRITE setMasterTempo NOTIFY masterTempoChanged)
     Q_PROPERTY(bool tempoGridActive READ tempoGridActive NOTIFY tempoSectionsChanged)
     Q_PROPERTY(bool tempoDetectionRunning READ tempoDetectionRunning NOTIFY tempoDetectionRunningChanged)
     Q_PROPERTY(bool detectTempo READ detectTempo WRITE setDetectTempo NOTIFY detectTempoChanged)
@@ -263,6 +264,11 @@ public:
      *  ms, including those of Beats tempo Functions (see Show::itemsInMs()) */
     bool itemsInMs() const;
 
+    /** Get/Set if the Show being edited sets the master tempo while it plays
+     *  within its tempo sections (see Show::setMasterTempo()) */
+    bool masterTempo() const;
+    void setMasterTempo(bool enable);
+
     /** Returns true if the current Show has tempo sections and shows a Time
      *  ruler, so that the timeline displays and snaps to their beat grid */
     bool tempoGridActive() const;
@@ -393,6 +399,7 @@ private:
 
 signals:
     void tempoSectionsChanged();
+    void masterTempoChanged();
     void tempoDetectionRunningChanged();
     void detectTempoChanged();
     void tempoDetectionProgress(int done, int total);

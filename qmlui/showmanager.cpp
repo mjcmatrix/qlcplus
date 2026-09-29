@@ -179,6 +179,7 @@ void ShowManager::setCurrentShowID(int currentShowID)
     /* Emit time/beat change in case the new Show differs */
     emit timeDivisionChanged(timeDivision());
     emit tempoSectionsChanged();
+    emit masterTempoChanged();
     emit beatsDivisionChanged(beatsDivision());
     m_timeScale = 0.0; // force setTimeScale() to recompute and notify
     setTimeScale(timeDivision() == Show::Time ? 5.0 : 1.0);
@@ -545,6 +546,21 @@ QVariantList ShowManager::tempoSections() const
     }
 
     return list;
+}
+
+bool ShowManager::masterTempo() const
+{
+    return m_currentShow != nullptr && m_currentShow->masterTempo();
+}
+
+void ShowManager::setMasterTempo(bool enable)
+{
+    if (m_currentShow == nullptr || m_currentShow->masterTempo() == enable)
+        return;
+
+    m_currentShow->setMasterTempo(enable);
+    m_doc->setModified();
+    emit masterTempoChanged();
 }
 
 bool ShowManager::itemsInMs() const
