@@ -105,11 +105,50 @@ private:
     bool m_tempoMapActive;
     TempoMap m_tempoMap;
 
-    /** List of the currently running Functions and their stop time */
-    QList < QPair<Function *, quint32> > m_runningQueue;
+    /** An item of the Show running its Function. Items and Functions are
+     *  kept by ID, since both can be deleted while the Show runs */
+    struct RunningItem
+    {
+        quint32 itemId;     // the ShowFunction ID
+        quint32 functionId;
+        quint32 stopTime;   // in ms, or in beats as ms for beat-based items
+    };
+
+    /** List of the items currently running their Function */
+    QList<RunningItem> m_runningQueue;
 
 private:
     FunctionParent functionParent() const;
+
+    /************************************************************************
+     * Live edits
+     ************************************************************************/
+private:
+    /** Follow the edits made to the Show while it runs: items added, moved,
+     *  resized or deleted, Functions deleted and tempo sections edited */
+    void syncItems();
+
+    /** Rebuild the lists of the items to play and update the running ones */
+    void rebuildItems();
+
+    /** Get a digest of the Show items, to notice when they are edited */
+    quint64 itemsDigest() const;
+
+    /** Get the Show position $function items are placed with: ms, or
+     *  beats as ms for beat-based items without a tempo map */
+    quint32 currentTime(const Function *function) const;
+
+    /** Mark $sf as started in this run */
+    void setItemStarted(ShowFunction *sf);
+
+private:
+    /** The items started in this run, with the start time they had then.
+     *  An item moved to another start time can play again */
+    QMap<quint32, quint32> m_startedItems;
+
+    /** The digest of the Show items the lists were built from */
+    quint64 m_itemsDigest;
+    bool m_itemsSynced;
 
     /************************************************************************
      * Output hold
@@ -129,8 +168,9 @@ private:
     /** Apply the track intensity of $sf to its Function $f */
     void requestTrackIntensity(ShowFunction *sf, Function *f);
 
-    /** Return true if $function is in the running queue for any item */
-    bool isQueued(Function *function) const;
+    /** Return true if the Function with ID $functionId is in the running
+     *  queue for any item */
+    bool isQueued(quint32 functionId) const;
 
 private:
     /** True while the Show is held, waiting for an output to start */
@@ -140,10 +180,10 @@ private:
     quint32 m_outputHoldTime = 0;
 
     /** Items started by startOutputHold(), to be skipped by write() */
-    QSet<ShowFunction *> m_preStartedFunctions;
+    QSet<quint32> m_preStartedItems;
 
-    /** Functions paused by startOutputHold(), resumed on release */
-    QList<Function *> m_holdPausedFunctions;
+    /** IDs of the Functions paused by startOutputHold(), resumed on release */
+    QList<quint32> m_holdPausedFunctions;
 
 signals:
     void timeChanged(quint32 time);

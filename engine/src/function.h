@@ -37,6 +37,7 @@ class QXmlStreamReader;
 
 class GenericFader;
 class TempoMapClock;
+class TempoMap;
 class MasterTimer;
 class Function;
 class Doc;
@@ -804,6 +805,14 @@ public:
      * and beat grids instead of the global BPM.
      */
     QSharedPointer<const TempoMapClock> tempoMapClock() const;
+
+    /**
+     * Replace the tempo map of the clock the function was started with, if
+     * any, keeping the Show time it started at. The Show calls this when its
+     * tempo sections are edited while it runs. Functions running other
+     * functions on the clock hand the new tempo map to them too.
+     */
+    virtual void updateTempoMap(const TempoMap &tempoMap);
 
     /**
      * Pause a running Function. Subclasses should check the paused state

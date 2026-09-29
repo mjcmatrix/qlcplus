@@ -102,6 +102,10 @@ public:
     /** Get the tempo sections of this Show */
     const TempoMap &tempoMap() const;
 
+    /** Get a copy of the tempo sections, safe to take from the MasterTimer
+     *  thread while the tempo map may be edited */
+    TempoMap tempoMapSnapshot() const;
+
     /**
      * Replace the tempo sections of this Show.
      *
@@ -135,6 +139,7 @@ signals:
 
 private:
     TempoMap m_tempoMap;
+    mutable QMutex m_tempoMapMutex;
     bool m_itemsInMs;
 
     /*********************************************************************
