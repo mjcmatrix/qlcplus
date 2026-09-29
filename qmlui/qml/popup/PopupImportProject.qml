@@ -151,6 +151,9 @@ CustomPopupDialog
                 clip: true
                 z: 4
                 boundsBehavior: Flickable.StopAtBounds
+                // see FixtureGroupManager: keep all top level delegates alive so
+                // that contentHeight is exact and the scrollbar doesn't jump
+                cacheBuffer: 1000000
 
                 property bool dragActive: false
 
@@ -225,6 +228,9 @@ CustomPopupDialog
                 z: 4
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
+                // see FixtureGroupManager: keep all top level delegates alive so
+                // that contentHeight is exact and the scrollbar doesn't jump
+                cacheBuffer: 1000000
 
 
                 model: popupRoot.visible ? importManager.functionsTreeModel : null

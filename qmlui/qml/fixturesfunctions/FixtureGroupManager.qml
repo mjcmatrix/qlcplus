@@ -486,6 +486,11 @@ Rectangle
             //        (propertiesHeader.visible ? propertiesHeader.height : 0)
             z: 4
             boundsBehavior: Flickable.StopAtBounds
+            // tree nodes have very different heights, so keep every top level
+            // delegate alive: otherwise the view can only estimate contentHeight
+            // from the items currently instantiated, which makes the scrollbar
+            // handle jump while it is dragged
+            cacheBuffer: 1000000
 
             property bool dragActive: false
 

@@ -268,7 +268,11 @@ Rectangle
           height: fmContainer.height - topBar.height - (searchBox.visible ? searchBox.height : 0)
           z: 4
           boundsBehavior: Flickable.StopAtBounds
-          cacheBuffer: Math.max(height, 0)
+          // tree nodes have very different heights, so keep every top level
+          // delegate alive: otherwise the view can only estimate contentHeight
+          // from the items currently instantiated, which makes the scrollbar
+          // handle jump while it is dragged
+          cacheBuffer: 1000000
           Layout.fillHeight: true
 
           Component.onCompleted: contentY = functionManager.viewPosition

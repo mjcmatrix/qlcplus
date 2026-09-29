@@ -187,6 +187,11 @@ Item
                     rightMargin: UISettings.listItemHeight * 0.25
                                  + (scrollShown ? UISettings.scrollBarWidth : 0)
                     boundsBehavior: Flickable.StopAtBounds
+                    // group boxes grow with the number of member fixtures, so keep
+                    // them all alive: see FixtureGroupManager. contentHeight would
+                    // otherwise be an estimate, making the scrollbar handle jump
+                    // and scrollShown unreliable
+                    cacheBuffer: 1000000
                     model: stageWizard ? stageWizard.groupsModel : []
                     ScrollBar.vertical: CustomScrollBar {}
 
@@ -283,6 +288,8 @@ Item
                         spacing: UISettings.listItemHeight * 0.2
                         topMargin: UISettings.listItemHeight * 0.25
                         model: stageWizard ? stageWizard.fixtureRoleModel : []
+                        // see above: role boxes have varying heights too
+                        cacheBuffer: 1000000
                         ScrollBar.vertical: CustomScrollBar {}
 
                         delegate: FixtureGroupRoleDelegate
