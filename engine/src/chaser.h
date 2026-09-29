@@ -296,6 +296,9 @@ public:
     void setPause(bool enable) override;
 
     /** @reimp */
+    void updateTempoMap(const TempoMap &tempoMap) override;
+
+    /** @reimp */
     void write(MasterTimer* timer, QList<Universe *> universes) override;
 
     /** @reimp */

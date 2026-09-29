@@ -30,6 +30,7 @@
 
 class QElapsedTimer;
 class TempoMapClock;
+class TempoMap;
 class FadeChannel;
 class ChaserStep;
 class Function;
@@ -92,6 +93,12 @@ private:
     /************************************************************************
      * Tempo map clock
      ************************************************************************/
+public:
+    /** Replace the tempo map the steps run on (see Function::updateTempoMap()).
+     *  The running step keeps its end time, the next steps follow the new
+     *  tempo map, as does the Function of the running step */
+    void updateTempoMap(const TempoMap &tempoMap);
+
 private:
     /** Returns true if the steps run on the beat grid of a Show tempo map
      *  instead of the MasterTimer beats */
