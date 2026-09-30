@@ -60,6 +60,7 @@ class ShowManager final : public PreviewContext
     Q_PROPERTY(int currentShowID READ currentShowID WRITE setCurrentShowID NOTIFY currentShowIDChanged)
     Q_PROPERTY(bool isEditing READ isEditing NOTIFY isEditingChanged)
     Q_PROPERTY(QString showName READ showName WRITE setShowName NOTIFY showNameChanged)
+    Q_PROPERTY(QVariantList showsList READ showsList NOTIFY showsListChanged)
     Q_PROPERTY(QColor itemsColor READ itemsColor WRITE setItemsColor NOTIFY itemsColorChanged)
 
     Q_PROPERTY(bool stretchFunctions READ stretchFunctions WRITE setStretchFunctions NOTIFY stretchFunctionsChanged)
@@ -124,6 +125,10 @@ public:
     /** Set the name of the Show Function to edit */
     void setShowName(QString showName);
 
+    /** Return the list of the Show Functions available in the workspace,
+     *  as a QML model of { mLabel, mValue } entries sorted by name */
+    QVariantList showsList() const;
+
     /** Reset the Show Manager contents to an initial state */
     Q_INVOKABLE void resetContents();
 
@@ -171,6 +176,7 @@ signals:
     void currentShowIDChanged(int currentShowID);
     void isEditingChanged();
     void showNameChanged(QString showName);
+    void showsListChanged();
     void stretchFunctionsChanged(bool stretchFunction);
     void gridEnabledChanged(bool gridEnabled);
     void snapToItemsChanged(bool snapToItems);
@@ -922,6 +928,11 @@ private:
 
 protected slots:
     void slotFunctionRemoved(quint32 id);
+
+    /** Refresh the Show selector model when a Show Function is
+     *  added to, removed from or renamed in the workspace */
+    void slotFunctionListChanged(quint32 id);
+
     void slotTimeChanged(quint32 msec_time);
     void slotShowFinished();
     void slotShowStopped();
