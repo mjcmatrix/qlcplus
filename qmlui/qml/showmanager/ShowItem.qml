@@ -162,10 +162,17 @@ Item
        end (!$wantPrevious) edge, when dragging that edge should move the
        boundary the two of them share - resizing both at once instead of just
        this one. That is the case when both items are selected, so that the
-       intent to treat them as a pair is explicit, or while the Alt modifier
-       is held, which pairs them up for a single gesture without selecting
-       anything. Returns null when the edge is to be resized on its own */
-    function adjacentPairItem(wantPrevious, modifiers)
+       intent to treat them as a pair is explicit, or when $forcePair is set,
+       which pairs them up for a single gesture without selecting anything.
+       Returns null when the edge is to be resized on its own.
+
+       $forcePair comes from where the handle was grabbed rather than a
+       keyboard modifier: a modifier has no equivalent on a touchscreen, and
+       on desktop a held Alt is intercepted by most Linux window managers as
+       "move the window" before the application ever sees it. Grabbing right
+       on the seam shared with the neighbour is unambiguous on any input
+       device and needs no modifier at all */
+    function adjacentPairItem(wantPrevious, forcePair)
     {
         if (sfRef === null || sfRef.locked)
             return null
@@ -174,7 +181,7 @@ Item
         if (!partner || !partner.sfRef || partner.sfRef.locked)
             return null
 
-        if ((modifiers & Qt.AltModifier) === 0 && !(isSelected && partner.isSelected))
+        if (!forcePair && !(isSelected && partner.isSelected))
             return null
 
         return partner
@@ -1031,9 +1038,10 @@ Item
                 origItemW = itemRoot.width
 
                 /* whether the drag moves the shared boundary is decided here,
-                   so that letting Alt go halfway through doesn't turn a
-                   boundary resize into an ordinary one */
-                pairItem = adjacentPairItem(true, mouse.modifiers)
+                   from the press position, so that moving off the seam
+                   halfway through doesn't turn a boundary resize into an
+                   ordinary one */
+                pairItem = adjacentPairItem(true, mouse.x <= handleWidth / 2)
                 setBoundaryPartner(pairItem, true)
                 if (pairItem)
                 {
@@ -1058,7 +1066,7 @@ Item
                        being resized from the other side, which keeps it under
                        the pointer for that whole drag */
                     setBoundaryPartner(containsMouse && !isDragging
-                                       ? adjacentPairItem(true, mouse.modifiers) : null, true)
+                                       ? adjacentPairItem(true, mouse.x <= handleWidth / 2) : null, true)
                     return
                 }
 
@@ -1269,9 +1277,10 @@ Item
                 itemSnapped = false
                 snapEdges = getVisibleSnapEdges()
 
-                /* see the left handle: the pair is decided on press, so that
-                   releasing Alt mid-drag doesn't change what is resized */
-                pairItem = adjacentPairItem(false, mouse.modifiers)
+                /* see the left handle: the pair is decided from the press
+                   position, so that drifting off the seam mid-drag doesn't
+                   change what is resized */
+                pairItem = adjacentPairItem(false, mouse.x >= handleWidth / 2)
                 setBoundaryPartner(pairItem, false)
                 if (pairItem)
                 {
@@ -1291,7 +1300,7 @@ Item
                 {
                     // see the left handle
                     setBoundaryPartner(containsMouse && !isDragging
-                                       ? adjacentPairItem(false, mouse.modifiers) : null, false)
+                                       ? adjacentPairItem(false, mouse.x >= handleWidth / 2) : null, false)
                     return
                 }
 
