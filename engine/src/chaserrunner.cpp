@@ -252,6 +252,20 @@ uint ChaserRunner::stepDuration(int stepIdx) const
  * Tempo map clock
  ****************************************************************************/
 
+void ChaserRunner::updateTempoMap(const TempoMap &tempoMap)
+{
+    if (hasTempoMapClock() == false)
+        return;
+
+    m_tempoMapClock = QSharedPointer<const TempoMapClock>(new TempoMapClock(tempoMap, m_tempoMapClock->origin));
+
+    foreach (ChaserRunnerStep *step, m_runnerSteps)
+    {
+        if (step->m_function != NULL)
+            step->m_function->updateTempoMap(tempoMap);
+    }
+}
+
 bool ChaserRunner::hasTempoMapClock() const
 {
     return m_tempoMapClock.isNull() == false;

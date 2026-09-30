@@ -109,6 +109,7 @@ private slots:
     void beatsSerialOffset();
     void beatsFadeIn();
     void beatsChaserFadeOverride();
+    void convertTempoType();
 
 private:
     EFX *createEFX(int fixtures);

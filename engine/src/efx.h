@@ -28,6 +28,7 @@
 
 #include "efxfixture.h"
 #include "function.h"
+#include "tempomap.h"
 
 class QXmlStreamReader;
 class GenericFader;
@@ -610,6 +611,9 @@ public:
     /** @reimp */
     void postRun(MasterTimer* timer, QList<Universe*> universes) override;
 
+    /** @reimp */
+    void updateTempoMap(const TempoMap &tempoMap) override;
+
     /** Get the time elapsed since the EFX was started, in its tempo units:
      *  milliseconds in Time tempo, 1/1000 beats in Beats tempo */
     quint32 tempoElapsed() const;
@@ -621,6 +625,27 @@ private:
      *  Returns how many 1/1000 beats the EFX has moved on */
     uint advanceBeatClock(MasterTimer *timer);
 
+    /** Advance a Beats tempo EFX started by a Show with tempo sections by
+     *  one tick, on the tempo map. Returns how many 1/1000 beats the EFX
+     *  has moved on */
+    uint advanceTempoMapClock(MasterTimer *timer);
+
+    /** Update m_beatUnits from m_beatPosition and return the difference */
+    uint updateBeatUnits();
+
+    /** Advance a Beats tempo EFX that a Show with tempo sections didn't
+     *  start by one tick, on the tempo of that Show, at $time on $tempoMap
+     *  (see MasterTimer::showTempo()) */
+    uint advanceShowTempo(MasterTimer *timer, const TempoMap &tempoMap, double time, bool paused);
+
+    /** Add the part of the pending phase correction due over $step beats
+     *  to $step */
+    double easeBeatCorrection(double step);
+
+    /** Set the phase correction for an $error (in beats) measured on a beat,
+     *  unless the pending correction leaves it within $tolerance ms */
+    void lockOntoBeat(double error, double beatDuration, double tolerance);
+
 private:
     /** Beats elapsed since the EFX was started */
     double m_beatPosition;
@@ -631,6 +656,11 @@ private:
     double m_beatCorrection;
     /** The phase correction applied over the beat following its measure */
     double m_beatCorrectionRate;
+    /** The beat count on the tempo map of a Show with tempo sections */
+    TempoMap::BeatCursor m_beatCursor;
+    /** The grid position of the Show followed at the last tick, or -1 when
+     *  not following a running Show */
+    double m_showGridPosition;
 
     /*********************************************************************
      * Intensity

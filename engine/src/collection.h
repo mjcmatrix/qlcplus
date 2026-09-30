@@ -149,6 +149,9 @@ public:
     void setPause(bool enable) override;
 
     /** @reimpl */
+    void updateTempoMap(const TempoMap &tempoMap) override;
+
+    /** @reimpl */
     void write(MasterTimer* timer, QList<Universe *> universes) override;
 
     /** @reimpl */

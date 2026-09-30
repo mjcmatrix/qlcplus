@@ -348,6 +348,19 @@ void Collection::setPause(bool enable)
     Function::setPause(enable);
 }
 
+void Collection::updateTempoMap(const TempoMap &tempoMap)
+{
+    Function::updateTempoMap(tempoMap);
+
+    QMutexLocker locker(&m_functionListMutex);
+    foreach (quint32 fid, m_runningChildren)
+    {
+        Function *function = doc()->function(fid);
+        if (function != NULL)
+            function->updateTempoMap(tempoMap);
+    }
+}
+
 void Collection::write(MasterTimer *timer, QList<Universe *> universes)
 {
     Q_UNUSED(timer);

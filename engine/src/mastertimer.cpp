@@ -21,6 +21,7 @@
 #include <QDebug>
 #include <QSettings>
 #include <QMutexLocker>
+#include <cmath>
 
 #if defined(WIN32) || defined(Q_OS_WIN)
 #   include "mastertimer-win32.h"
@@ -32,6 +33,7 @@
 #include "inputoutputmap.h"
 #include "genericfader.h"
 #include "mastertimer.h"
+#include "tempomap.h"
 #include "dmxsource.h"
 #include "function.h"
 #include "universe.h"
@@ -66,6 +68,18 @@ MasterTimer::MasterTimer(Doc* doc)
     , m_beatTimeDuration(500)
     , m_beatRequested(false)
     , m_lastBeatOffset(0)
+    , m_tickCount(0)
+    , m_showTempoId(Function::invalidId())
+    , m_showTempoOrder(0)
+    , m_showTempoCounter(0)
+    , m_showTempoMap(NULL)
+    , m_showTempoTime(0)
+    , m_showTempoTick(0)
+    , m_showTempoPaused(false)
+    , m_showTempoActive(false)
+    , m_showTempoBpm(0)
+    , m_showGridPosition(-1)
+    , m_showTempoWasPaused(false)
 {
     Q_ASSERT(doc != NULL);
     Q_ASSERT(d_ptr != NULL);
@@ -116,7 +130,11 @@ void MasterTimer::timerTick()
     qDebug() << "[MasterTimer] *********** tick:" << ticksCount++ << "**********";
 #endif
 
-    switch (m_beatSourceType)
+    // a Show setting the master tempo stands in for the internal beat
+    // generator (or the lack of one), never for an external source
+    bool showBeats = m_beatSourceType != External && generateShowTempoBeat();
+
+    switch (showBeats ? External : m_beatSourceType)
     {
         case Internal:
         {
@@ -155,6 +173,7 @@ void MasterTimer::timerTick()
     doc->inputOutputMap()->releaseUniverses();
 
     m_beatRequested = false;
+    m_tickCount++;
 
     //qDebug() << ">>>>>>>> MASTERTIMER TICK";
     emit tickReady();
@@ -390,16 +409,25 @@ void MasterTimer::requestBpmNumber(int bpm)
 
 int MasterTimer::bpmNumber() const
 {
+    if (m_showTempoActive)
+        return qRound(m_showTempoBpm);
+
     return m_currentBPM;
 }
 
 int MasterTimer::beatTimeDuration() const
 {
+    if (m_showTempoActive)
+        return qRound(60000.0 / m_showTempoBpm);
+
     return m_beatTimeDuration;
 }
 
 int MasterTimer::timeToNextBeat() const
 {
+    if (m_showTempoActive)
+        return qRound((floor(m_showGridPosition) + 1 - m_showGridPosition) * 60000.0 / m_showTempoBpm);
+
     return m_beatTimeDuration - m_beatTimer.elapsed();
 }
 
@@ -408,7 +436,7 @@ int MasterTimer::nextBeatTimeOffset() const
     // get the time offset to the next beat
     int toNext = timeToNextBeat();
     // get the percentage of beat time passed
-    int beatPercentage = (100 * toNext) / m_beatTimeDuration;
+    int beatPercentage = (100 * toNext) / beatTimeDuration();
 
     // if a Function has been started within the first LATE_TO_BEAT_THRESHOLD %
     // of a beat, then it means it is "late" but there's
@@ -431,4 +459,121 @@ void MasterTimer::requestBeat()
     // forceful request of a beat, processed at
     // the next timerTick call
     m_beatRequested = true;
+}
+
+/*************************************************************************
+ * Show tempo
+ *************************************************************************/
+
+quint64 MasterTimer::nextShowTempoOrder()
+{
+    return ++m_showTempoCounter;
+}
+
+void MasterTimer::setShowTempo(quint32 showId, quint64 order, const TempoMap *tempoMap, quint32 time, bool paused)
+{
+    // the Show started last takes over
+    if (m_showTempoMap != NULL && showId != m_showTempoId && order < m_showTempoOrder)
+        return;
+
+    m_showTempoId = showId;
+    m_showTempoOrder = order;
+    m_showTempoMap = tempoMap;
+    m_showTempoTime = time;
+    m_showTempoTick = m_tickCount;
+    m_showTempoPaused = paused;
+}
+
+void MasterTimer::clearShowTempo(quint32 showId)
+{
+    if (showId != m_showTempoId)
+        return;
+
+    m_showTempoId = Function::invalidId();
+    m_showTempoOrder = 0;
+    m_showTempoMap = NULL;
+}
+
+const TempoMap *MasterTimer::showTempo(double *time, bool *paused) const
+{
+    if (m_showTempoMap == NULL)
+        return NULL;
+
+    // the Show may run after the caller in this tick, or have stopped
+    // publishing (e.g. paused) since
+    double elapsed = m_showTempoTime;
+    if (m_showTempoPaused == false)
+        elapsed += double(m_tickCount - m_showTempoTick) * tick();
+
+    if (time != NULL)
+        *time = elapsed;
+    if (paused != NULL)
+        *paused = m_showTempoPaused;
+
+    return m_showTempoMap;
+}
+
+bool MasterTimer::showTempoActive() const
+{
+    return m_showTempoActive;
+}
+
+bool MasterTimer::generateShowTempoBeat()
+{
+    bool wasActive = m_showTempoActive;
+    double time = 0;
+    bool paused = false;
+    const TempoMap *tempoMap = showTempo(&time, &paused);
+
+    if (tempoMap == NULL || tempoMap->isBeforeSections(time))
+    {
+        m_showTempoActive = false;
+        m_showGridPosition = -1;
+        if (wasActive)
+            emit bpmNumberChanged(m_currentBPM);
+        return false;
+    }
+
+    double bpm = 60000.0 / tempoMap->beatDurationAt(time, m_currentBPM);
+    bool gridBeat = false;
+
+    if (paused)
+    {
+        // a paused Show keeps its tempo: the beats go on at its BPM
+        if (m_showGridPosition < 0)
+            m_showGridPosition = tempoMap->gridPosition(time, m_currentBPM);
+        double next = m_showGridPosition + tick() * bpm / 60000.0;
+        gridBeat = floor(next) > floor(m_showGridPosition);
+        m_showGridPosition = next;
+    }
+    else
+    {
+        double grid = tempoMap->gridPosition(time, m_currentBPM);
+        if (m_showGridPosition < 0 || m_showTempoWasPaused)
+        {
+            // (re)starting on the grid: a beat if one is due at this tick
+            gridBeat = (grid - floor(grid)) * (60000.0 / bpm) < tick();
+        }
+        else
+        {
+            // a grid beat passed since the last tick, or a section started
+            gridBeat = floor(grid) > floor(m_showGridPosition) || grid < m_showGridPosition;
+        }
+        m_showGridPosition = grid;
+    }
+    m_showTempoWasPaused = paused;
+
+    m_showTempoActive = true;
+    if (wasActive == false || qRound(bpm) != qRound(m_showTempoBpm))
+    {
+        m_showTempoBpm = bpm;
+        emit bpmNumberChanged(qRound(bpm));
+    }
+    m_showTempoBpm = bpm;
+
+    m_beatRequested = gridBeat;
+    if (gridBeat)
+        emit beat();
+
+    return true;
 }

@@ -37,6 +37,7 @@ class QXmlStreamReader;
 
 class GenericFader;
 class TempoMapClock;
+class TempoMap;
 class MasterTimer;
 class Function;
 class Doc;
@@ -454,6 +455,24 @@ public:
     /** Convert a beat value to a time value in milliseconds */
     static uint beatsToTime(uint beats, int beatDuration);
 
+    /** Convert the speed $time (ms) to beats (1000 units per beat) at $bpm,
+     *  rounded to the nearest multiple of $resolution beats. Zero, infinite
+     *  and default speeds are kept, and any other value is at least
+     *  $resolution beats */
+    static uint speedToBeats(uint time, double bpm, double resolution);
+
+    /** Convert the speed $beats (1000 units per beat) to ms at $bpm.
+     *  Zero, infinite and default speeds are kept */
+    static uint speedToTime(uint beats, double bpm);
+
+    /**
+     * Convert the Function to the $type tempo, converting its fade in, fade
+     * out and duration at $bpm. Converting to beats rounds to multiples of
+     * $resolution beats. Unlike setTempoType(), this doesn't use the global
+     * BPM. Subclasses with more speeds (e.g. Chaser steps) convert them too.
+     */
+    virtual void convertTempoType(TempoType type, double bpm, double resolution);
+
     /** Get the override speed type (done by a Chaser) */
     TempoType overrideTempoType() const;
 
@@ -804,6 +823,14 @@ public:
      * and beat grids instead of the global BPM.
      */
     QSharedPointer<const TempoMapClock> tempoMapClock() const;
+
+    /**
+     * Replace the tempo map of the clock the function was started with, if
+     * any, keeping the Show time it started at. The Show calls this when its
+     * tempo sections are edited while it runs. Functions running other
+     * functions on the clock hand the new tempo map to them too.
+     */
+    virtual void updateTempoMap(const TempoMap &tempoMap);
 
     /**
      * Pause a running Function. Subclasses should check the paused state

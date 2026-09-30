@@ -164,7 +164,7 @@ public:
      * $bpm. Converting to beats rounds to multiples of $resolution beats.
      * Unlike setTempoType(), this doesn't use the global BPM.
      */
-    void convertTempoType(TempoType type, double bpm, double resolution);
+    void convertTempoType(TempoType type, double bpm, double resolution) override;
 
 public slots:
     /**
@@ -294,6 +294,9 @@ public:
 
     /** @reimp */
     void setPause(bool enable) override;
+
+    /** @reimp */
+    void updateTempoMap(const TempoMap &tempoMap) override;
 
     /** @reimp */
     void write(MasterTimer* timer, QList<Universe *> universes) override;
