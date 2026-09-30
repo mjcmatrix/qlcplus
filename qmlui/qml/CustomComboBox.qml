@@ -58,6 +58,21 @@ ComboBox
 
     signal valueChanged(int value)
 
+    /*! Emitted when the user types in the text field of an editable
+        combo box. Unlike editTextChanged, this is never emitted when the
+        text is updated programmatically or by a selection change */
+    signal textEdited(string text)
+
+    /*! Emitted when the user picks an entry from the drop-down. Unlike
+        valueChanged, this is never emitted while initializing or when the
+        model changes, so it can safely drive a destructive action */
+    signal userSelected(int value)
+
+    /*! Emitted when the user is done typing in the text field of an
+        editable combo box, either by pressing Return or by moving the
+        focus elsewhere */
+    signal editingFinished(string text)
+
     function initSelection()
     {
         if (!model)
@@ -221,7 +236,10 @@ ComboBox
                 currentFAIcon = itemFAIcon
 
                 if (itemValue !== undefined)
+                {
                     control.valueChanged(itemValue)
+                    control.userSelected(itemValue)
+                }
             }
 
             Rectangle { height: 1; width: parent.width; y: parent.height - 1 }
@@ -280,11 +298,17 @@ ComboBox
                 id: tField
                 x: (iconImg.visible || iconFa.visible) ? iconImg.width + 5 : 0
                 height: control.height
-                width: cRect.width //control ? (control.width - control.indicator.width - parent.leftPadding) : 100
+                /* When editable, the text field grabs the mouse, so it must
+                   leave the indicator uncovered for the popup to be reachable */
+                width: cRect.width - (control.editable && control.indicator ?
+                                          control.indicator.width + 10 : 0)
                 enabled: control.editable
                 opacity: control.enabled ? 1 : 0.3
                 font.family: UISettings.robotoFontName
                 font.pixelSize: UISettings.textSizeDefault
+                verticalAlignment: TextInput.AlignVCenter
+                topPadding: 0
+                bottomPadding: 0
                 text: control.editable ? control.editText : control.displayText
                 color: UISettings.fgMain
                 selectedTextColor: UISettings.fgMain
@@ -296,6 +320,31 @@ ComboBox
                     border.width: parent && parent.activeFocus ? 2 : 1
                     border.color: parent && parent.activeFocus ? UISettings.highlight : "transparent"
                     color: "transparent"
+                }
+
+                onTextEdited:
+                {
+                    control.editText = text
+                    control.textEdited(text)
+                }
+
+                onEditingFinished: control.editingFinished(text)
+
+                /* Typing breaks the declarative binding above, so the
+                   text has to be re-asserted whenever the source changes */
+                Connections
+                {
+                    target: control
+                    function onEditTextChanged()
+                    {
+                        if (control.editable && tField.text !== control.editText)
+                            tField.text = control.editText
+                    }
+                    function onDisplayTextChanged()
+                    {
+                        if (!control.editable && tField.text !== control.displayText)
+                            tField.text = control.displayText
+                    }
                 }
             }
         }

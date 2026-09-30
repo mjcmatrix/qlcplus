@@ -160,16 +160,59 @@ Rectangle
 
             spacing: 4
 
-            RobotoText { label: qsTr("Name") }
+            RobotoText { label: qsTr("Show") }
 
-            CustomTextEdit
+            CustomComboBox
             {
-                width: showMgrContainer.width / 5
-                height: parent.height - 10
-                text: showManager.showName
-                enabled: showManager.isEditing
+                id: showSelector
+                Layout.preferredWidth: showMgrContainer.width * 0.15
+                editable: true
+                enabled: showManager.showsList.length > 0
 
-                onTextEdited: showManager.showName = text
+                model: showManager.showsList
+                currValue: showManager.currentShowID
+
+                /* Picking an entry from the drop-down opens that Show for
+                   editing. Typing in the text field renames the current one.
+                   Neither valueChanged nor editTextChanged can be used here:
+                   both also fire while the combo box initializes itself or
+                   when the model changes, which would open or rename a Show
+                   behind the user's back */
+                onUserSelected:
+                    function(value)
+                    {
+                        showManager.currentShowID = value
+                    }
+
+                /* The Show list is sorted by name, so renaming on every
+                   keystroke would reorder the model under the text field
+                   being typed into. Commit the new name in one go instead,
+                   which also keeps the rename to a single undo step */
+                onEditingFinished:
+                    function(text)
+                    {
+                        showManager.showName = text
+                    }
+
+                /* CustomComboBox assigns currValue internally, which breaks
+                   the binding above: restore it when the Show is opened or
+                   closed from elsewhere (e.g. the Function Manager). With no
+                   Show loaded the combo box falls back to its first entry,
+                   so the text is blanked to not suggest one is being edited */
+                function syncToCurrentShow()
+                {
+                    currValue = showManager.currentShowID
+                    editText = showManager.isEditing ? showManager.showName : ""
+                }
+
+                Component.onCompleted: syncToCurrentShow()
+
+                Connections
+                {
+                    target: showManager
+                    function onCurrentShowIDChanged() { showSelector.syncToCurrentShow() }
+                    function onShowsListChanged() { Qt.callLater(showSelector.syncToCurrentShow) }
+                }
             }
 
             IconButton

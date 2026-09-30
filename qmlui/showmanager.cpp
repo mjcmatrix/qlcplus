@@ -109,6 +109,18 @@ ShowManager::ShowManager(QQuickView *view, Doc *doc, QObject *parent)
     connect(m_doc, SIGNAL(functionRemoved(quint32)),
             this, SLOT(slotFunctionRemoved(quint32)));
 
+    /* Keep the Show selector model in sync with the workspace */
+    connect(m_doc, SIGNAL(functionAdded(quint32)),
+            this, SLOT(slotFunctionListChanged(quint32)));
+    connect(m_doc, SIGNAL(functionRemoved(quint32)),
+            this, SLOT(slotFunctionListChanged(quint32)));
+    connect(m_doc, SIGNAL(functionNameChanged(quint32)),
+            this, SLOT(slotFunctionListChanged(quint32)));
+    connect(m_doc, SIGNAL(loaded()),
+            this, SIGNAL(showsListChanged()));
+    connect(m_doc, SIGNAL(cleared()),
+            this, SIGNAL(showsListChanged()));
+
     setContextResource("qrc:/ShowManager.qml");
     setContextTitle(tr("Show Manager"));
 }
@@ -206,6 +218,40 @@ void ShowManager::setShowName(QString showName)
 
     m_currentShow->setName(showName);
     emit showNameChanged(showName);
+}
+
+QVariantList ShowManager::showsList() const
+{
+    QVariantList list;
+    QList<Function *> shows = m_doc->functionsByType(Function::ShowType);
+
+    std::sort(shows.begin(), shows.end(),
+              [](const Function *left, const Function *right)
+              {
+                  return left->name().localeAwareCompare(right->name()) < 0;
+              });
+
+    for (Function *show : shows)
+    {
+        QVariantMap entry;
+        entry.insert("mLabel", show->name());
+        entry.insert("mValue", (int)show->id());
+        list.append(entry);
+    }
+
+    return list;
+}
+
+void ShowManager::slotFunctionListChanged(quint32 id)
+{
+    Function *f = m_doc->function(id);
+
+    /* On removal the Function is about to be destroyed but still
+       reachable, so its type can be checked here as well */
+    if (f != nullptr && f->type() != Function::ShowType)
+        return;
+
+    emit showsListChanged();
 }
 
 bool ShowManager::stretchFunctions() const
