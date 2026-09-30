@@ -29,6 +29,7 @@ engine/src/qlcconfig.h
 *.swp
 *.qmlc
 moc_predefs.h
+.qt/
 
 # Binaries
 *.exe
@@ -48,6 +49,7 @@ coverage/
 
 # Development IDEs
 .vscode/
+.idea/
 
 # CMake build
 CMakeLists.txt.user
