@@ -22,6 +22,7 @@ import QtQuick
 import org.qlcplus.classes 1.0
 
 import "TimeUtils.js" as TimeUtils
+import "GenericHelpers.js" as Helpers
 import "."
 
 Rectangle
@@ -45,6 +46,8 @@ Rectangle
     property bool showTimeMarkers: true
 
     signal clicked(int mouseX, int mouseY)
+    // a zoom asked for with the mouse wheel, holding the given ruler position
+    signal zoomRequested(bool zoomIn, real anchorX)
 
     // the selected time range, in pixels
     property real rangeLeft: showManager.hasTimeRange ? timeToPos(showManager.rangeStart) : 0
@@ -350,6 +353,28 @@ Rectangle
             }
             context.closePath()
             context.stroke()
+        }
+    }
+
+    /* Wheel zooming. It accepts no button, so presses go through to the
+       ruler MouseArea below, and it is left out of the ruler area itself so
+       that it works even where the ruler doesn't show the time markers */
+    MouseArea
+    {
+        anchors.fill: parent
+        z: 2
+        acceptedButtons: Qt.NoButton
+
+        onWheel: (wheel) =>
+        {
+            var direction = Helpers.wheelZoomDirection(wheel)
+            if (direction === 0)
+            {
+                wheel.accepted = false
+                return
+            }
+
+            tlHeaderCursorLayer.zoomRequested(direction > 0, wheel.x)
         }
     }
 

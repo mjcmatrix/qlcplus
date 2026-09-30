@@ -24,6 +24,7 @@ import QtQuick.Controls
 import org.qlcplus.classes 1.0
 
 import "TimeUtils.js" as TimeUtils
+import "GenericHelpers.js" as Helpers
 import "."
 
 /** The strip below the Show Manager ruler holding the Show tempo sections.
@@ -54,6 +55,9 @@ Rectangle
 
     // the take over choice of the sections being detected
     property bool detectPrecedence: false
+
+    // a zoom asked for with the mouse wheel, holding the given lane position
+    signal zoomRequested(bool zoomIn, real anchorX)
 
     readonly property real snapThreshold: 15
     readonly property real edgeWidth: 6
@@ -189,6 +193,27 @@ Rectangle
         bpmSpin.setValue(Math.round(section.bpm * 100))
         beatsPerBarSpin.value = section.beatsPerBar
         sectionEditor.open()
+    }
+
+    /* Wheel zooming, as on the ruler and the timeline. It is the bottom item
+       of the lane, which is enough because the sections above don't handle
+       the wheel themselves */
+    MouseArea
+    {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton
+
+        onWheel: (wheel) =>
+        {
+            var direction = Helpers.wheelZoomDirection(wheel)
+            if (direction === 0)
+            {
+                wheel.accepted = false
+                return
+            }
+
+            laneRoot.zoomRequested(direction > 0, wheel.x)
+        }
     }
 
     /** Beat grid ticks and bar numbers, drawn with the same chunk strategy

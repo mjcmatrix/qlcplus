@@ -24,6 +24,7 @@ import QtQuick.Controls
 import org.qlcplus.classes 1.0
 
 import "TimeUtils.js" as TimeUtils
+import "GenericHelpers.js" as Helpers
 import "."
 
 Rectangle
@@ -105,12 +106,63 @@ Rectangle
             xViewOffset = xPos
     }
 
-    function cursorPixelX()
+    // the timeline position in pixels of the given time, whatever
+    // time division the Show uses
+    function timeToPixel(time)
     {
         if (showManager.timeDivision === Show.Time)
-            return TimeUtils.timeToSize(showManager.currentTime, timeScale, tickSize)
+            return TimeUtils.timeToSize(time, timeScale, tickSize)
         else
-            return TimeUtils.timeToBeatPosition(showManager.currentTime, tickSize, ioManager.bpmNumber, showManager.beatsDivision)
+            return TimeUtils.timeToBeatPosition(time, tickSize, ioManager.bpmNumber, showManager.beatsDivision)
+    }
+
+    function cursorPixelX()
+    {
+        return timeToPixel(showManager.currentTime)
+    }
+
+    /* One zoom step in or out, for both the zoom buttons and the mouse wheel.
+       On a Time based Show the time scale divides the tick size, so a smaller
+       scale spreads the timeline out, while on a beat based one the tick size
+       follows the scale: the two go in opposite directions.
+       anchorX is a timeline position in pixels to hold still (the mouse
+       position, when zooming with the wheel). A negative value re-centres
+       the view on the time cursor instead */
+    function zoomTimeline(zoomIn, anchorX)
+    {
+        var growScale = (showManager.timeDivision === Show.Time) ? !zoomIn : zoomIn
+        var newScale = Helpers.nextTimeScale(showManager.timeScale, growScale)
+
+        if (anchorX < 0)
+        {
+            showManager.timeScale = newScale
+            centerView()
+            return
+        }
+
+        /* the pixels per second of the timeline, before and after the zoom.
+           The scale is bounded, so it may well not have changed at all,
+           which leaves the view offset where it is */
+        var oldRatio = timeToPixel(1000)
+        showManager.timeScale = newScale
+
+        var maxOffset = Math.max(0, timelineHeader.contentWidth - timelineHeader.width)
+        xViewOffset = Helpers.zoomAnchoredOffset(anchorX, xViewOffset, oldRatio, timeToPixel(1000), maxOffset)
+    }
+
+    /* Zooms on a Ctrl + wheel, or on a wheel with the middle button held,
+       around the given timeline position. Any other wheel event is handed
+       back to the Flickables, which keep scrolling the view */
+    function handleTimelineWheel(wheel, anchorX)
+    {
+        var direction = Helpers.wheelZoomDirection(wheel)
+        if (direction === 0)
+        {
+            wheel.accepted = false
+            return
+        }
+
+        zoomTimeline(direction > 0, anchorX)
     }
 
     // jumps xViewOffset forward by a page when the cursor gets within a
@@ -794,23 +846,8 @@ Rectangle
                 implicitHeight: parent.height - 2
                 fontColor: "#222"
 
-                onZoomOutClicked:
-                {
-                    if (showManager.timeScale >= 1.0)
-                        showManager.timeScale += 1.0
-                    else
-                        showManager.timeScale = Math.round((showManager.timeScale + 0.1) * 10) / 10
-                    centerView()
-                }
-
-                onZoomInClicked:
-                {
-                    if (showManager.timeScale > 1.0)
-                        showManager.timeScale -= 1.0
-                    else
-                        showManager.timeScale = Math.round((showManager.timeScale - 0.1) * 10) / 10
-                    centerView()
-                }
+                onZoomOutClicked: zoomTimeline(false, -1)
+                onZoomInClicked: zoomTimeline(true, -1)
             }
         }
     } // top bar
@@ -927,6 +964,8 @@ Rectangle
             headerHeight: showMgrContainer.headerHeight
             cursorHeight: showMgrContainer.height - topBar.height - (bottomPanel.visible ? bottomPanel.height : 0)
             duration: showManager.showDuration
+
+            onZoomRequested: (zoomIn, anchorX) => zoomTimeline(zoomIn, anchorX)
 
             onClicked: (mouseX, mouseY) =>
             {
@@ -1113,6 +1152,8 @@ Rectangle
             height: tempoLaneFlickable.height
             visibleX: xViewOffset
             visibleWidth: tempoLaneFlickable.width
+
+            onZoomRequested: (zoomIn, anchorX) => zoomTimeline(zoomIn, anchorX)
         }
     }
 
@@ -1198,6 +1239,18 @@ Rectangle
             ScrollBar.horizontal: horScrollBar
 
             onContentXChanged: xViewOffset = contentX
+
+            /* Zooming with the wheel. This sits above the Show items, whose
+               own MouseAreas don't handle the wheel, and passes anything
+               that isn't a zoom gesture down to the Flickables below */
+            MouseArea
+            {
+                anchors.fill: parent
+                z: 5
+                acceptedButtons: Qt.NoButton
+
+                onWheel: (wheel) => handleTimelineWheel(wheel, wheel.x)
+            }
 
             /* Clicking on the timeline background moves the cursor and clears
                the items selection, while dragging flicks the timeline.
