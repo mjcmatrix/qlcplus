@@ -98,6 +98,15 @@ Rectangle
                 wrapText: true
                 fontSize: UISettings.textSizeDefault
             }
+
+            IconButton
+            {
+                Layout.alignment: Qt.AlignVCenter
+                visible: patch ? ioManager.canConfigurePlugin(patch.pluginName) : false
+                imgSource: "qrc:/configure.svg"
+                tooltip: qsTr("Open the plugin configuration")
+                onClicked: if (patch) ioManager.configurePlugin(patch.pluginName)
+            }
         }
     }
 

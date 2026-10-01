@@ -124,7 +124,9 @@ Rectangle
         RowLayout
         {
             x: 8
-            width: parent.width - 16 - (fbLineButton.visible ? fbLineButton.width + 4 : 0)
+            // leave room for the right column (signal LED and feedback selector)
+            width: parent.width - 20 - Math.max(valueChangeBox.width + 8,
+                                                fbLineButton.visible ? fbLineButton.width + 2 : 0)
             anchors.verticalCenter: parent.verticalCenter
             spacing: 3
 
@@ -144,6 +146,15 @@ Rectangle
                 labelColor: "black"
                 wrapText: true
                 fontSize: UISettings.textSizeDefault
+            }
+
+            IconButton
+            {
+                Layout.alignment: Qt.AlignVCenter
+                visible: patch ? ioManager.canConfigurePlugin(patch.pluginName) : false
+                imgSource: "qrc:/configure.svg"
+                tooltip: qsTr("Open the plugin configuration")
+                onClicked: if (patch) ioManager.configurePlugin(patch.pluginName)
             }
         }
 
