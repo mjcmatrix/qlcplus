@@ -115,18 +115,6 @@ SidePanel
 
             IconButton
             {
-                id: outputConfigureButton
-                z: 2
-                visible: ioManager.outputCanConfigure
-                width: iconSize
-                height: iconSize
-                imgSource: "qrc:/configure.svg"
-                tooltip: qsTr("Open the plugin configuration")
-                onClicked: ioManager.configurePlugin(false)
-            }
-
-            IconButton
-            {
                 id: audioOutputConfigureButton
                 z: 2
                 visible: showAudioButton

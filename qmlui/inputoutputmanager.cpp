@@ -144,8 +144,6 @@ void InputOutputManager::setSelectedIndex(int index)
     m_selectedUniverseIndex = index;
 
     emit selectedIndexChanged();
-    emit inputCanConfigureChanged();
-    emit outputCanConfigureChanged();
 }
 
 void InputOutputManager::addUniverse()
@@ -630,21 +628,18 @@ void InputOutputManager::setOutputPatch(int universe, QString plugin, QString li
 {
     m_ioMap->setOutputPatch(universe, plugin, "", "", line.toUInt(), false, index);
     m_doc->setModified();
-    emit outputCanConfigureChanged();
 }
 
 void InputOutputManager::removeOutputPatch(int universe, int index)
 {
     m_ioMap->setOutputPatch(universe, KOutputNone, "", "", QLCIOPlugin::invalidLine(), false, index);
     m_doc->setModified();
-    emit outputCanConfigureChanged();
 }
 
 void InputOutputManager::addInputPatch(int universe, QString plugin, QString line)
 {
     m_ioMap->setInputPatch(universe, plugin, "", "", line.toUInt());
     m_doc->setModified();
-    emit inputCanConfigureChanged();
 }
 
 bool InputOutputManager::setFeedbackPatch(int universe, bool enable)
@@ -694,7 +689,6 @@ void InputOutputManager::removeInputPatch(int universe)
     if (m_ioMap->feedbackPatch(universe) != nullptr)
         m_ioMap->setOutputPatch(universe, KOutputNone, "", "", QLCIOPlugin::invalidLine(), true);
     m_doc->setModified();
-    emit inputCanConfigureChanged();
 }
 
 void InputOutputManager::setInputProfile(int universe, QString profileName)
@@ -703,74 +697,14 @@ void InputOutputManager::setInputProfile(int universe, QString profileName)
     m_doc->setModified();
 }
 
-void InputOutputManager::configurePlugin(bool input)
+void InputOutputManager::configurePlugin(QString pluginName)
 {
-    if (m_selectedUniverseIndex == -1)
-        return;
-
-    if (input)
-    {
-        InputPatch *patch = m_ioMap->inputPatch(m_selectedUniverseIndex);
-
-        if (patch == nullptr || patch->plugin() == nullptr)
-            return;
-
-        m_ioMap->configurePlugin(patch->plugin()->name());
-    }
-    else
-    {
-        // an output universe can have multiple patches, so open the
-        // configuration dialog of every patched plugin, once each
-        QStringList configured;
-
-        for (int i = 0; i < m_ioMap->outputPatchesCount(m_selectedUniverseIndex); i++)
-        {
-            OutputPatch *patch = m_ioMap->outputPatch(m_selectedUniverseIndex, i);
-
-            if (patch == nullptr || patch->plugin() == nullptr)
-                continue;
-
-            QString pluginName = patch->plugin()->name();
-
-            if (configured.contains(pluginName))
-                continue;
-
-            configured.append(pluginName);
-            m_ioMap->configurePlugin(pluginName);
-        }
-    }
+    m_ioMap->configurePlugin(pluginName);
 }
 
-bool InputOutputManager::inputCanConfigure() const
+bool InputOutputManager::canConfigurePlugin(QString pluginName) const
 {
-    if (m_selectedUniverseIndex == -1)
-        return false;
-
-    InputPatch *patch = m_ioMap->inputPatch(m_selectedUniverseIndex);
-
-    if (patch == nullptr || patch->plugin() == nullptr)
-        return false;
-
-    return patch->plugin()->canConfigure();
-}
-
-bool InputOutputManager::outputCanConfigure() const
-{
-    if (m_selectedUniverseIndex == -1)
-        return false;
-
-    for (int i = 0; i < m_ioMap->outputPatchesCount(m_selectedUniverseIndex); i++)
-    {
-        OutputPatch *patch = m_ioMap->outputPatch(m_selectedUniverseIndex, i);
-
-        if (patch == nullptr || patch->plugin() == nullptr)
-            continue;
-
-        if (patch->plugin()->canConfigure())
-            return true;
-    }
-
-    return false;
+    return m_ioMap->canConfigurePlugin(pluginName);
 }
 
 int InputOutputManager::outputPatchesCount(int universe) const
