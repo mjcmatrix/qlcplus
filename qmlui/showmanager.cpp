@@ -45,6 +45,8 @@
 #define SETTINGS_DETECT_TEMPO QStringLiteral("showmanager/detecttempo")
 #define KXMLQLCShowManagerCurrentShow QStringLiteral("CurrentShow")
 #define KXMLQLCShowManagerTimeScale   QStringLiteral("TimeScale")
+#define KXMLQLCShowManagerShowZoom    QStringLiteral("ShowZoom")
+#define KXMLQLCShowManagerShowID      QStringLiteral("ID")
 
 /* Timeline zoom limits. Every item position and size is computed by
    dividing by the time scale, so it must never reach zero or go
@@ -193,8 +195,13 @@ void ShowManager::setCurrentShowID(int currentShowID)
     emit tempoSectionsChanged();
     emit masterTempoChanged();
     emit beatsDivisionChanged(beatsDivision());
+    /* Reopen the Show at the zoom level it was last left at, or at the
+       default one of its time division if it was never zoomed */
+    float timeScale = timeDivision() == Show::Time ? 5.0 : 1.0;
+    if (m_currentShow != nullptr)
+        timeScale = m_showTimeScales.value(m_currentShow->id(), timeScale);
     m_timeScale = 0.0; // force setTimeScale() to recompute and notify
-    setTimeScale(timeDivision() == Show::Time ? 5.0 : 1.0);
+    setTimeScale(timeScale);
 
     emit tracksChanged();
     setPlaybackState(m_currentShow != nullptr ? m_currentShow->isRunning() : false,
@@ -515,6 +522,9 @@ float ShowManager::timeScale() const
 void ShowManager::setTimeScale(float timeScale)
 {
     timeScale = qBound(SHOWMGR_MIN_TIME_SCALE, timeScale, SHOWMGR_MAX_TIME_SCALE);
+
+    if (m_currentShow != nullptr)
+        m_showTimeScales[m_currentShow->id()] = timeScale;
 
     if (m_timeScale == timeScale)
         return;
@@ -3207,6 +3217,8 @@ void ShowManager::slotFunctionRemoved(quint32 id)
        destroyed: drop every reference to it and its items before that */
     if (m_currentShow != nullptr && m_currentShow->id() == id)
         resetContents();
+
+    m_showTimeScales.remove(id);
 }
 
 /*********************************************************************
@@ -4760,13 +4772,26 @@ bool ShowManager::saveXML(QXmlStreamWriter *doc) const
 {
     Q_ASSERT(doc != nullptr);
 
-    /* Nothing to remember if no Show is being edited */
-    if (m_currentShow == nullptr)
+    /* Nothing to remember if no Show is being edited or was ever zoomed */
+    if (m_currentShow == nullptr && m_showTimeScales.isEmpty())
         return true;
 
     doc->writeStartElement(KXMLQLCShowManager);
-    doc->writeAttribute(KXMLQLCShowManagerCurrentShow, QString::number(m_currentShow->id()));
-    doc->writeAttribute(KXMLQLCShowManagerTimeScale, QString::number(m_timeScale));
+    if (m_currentShow != nullptr)
+    {
+        doc->writeAttribute(KXMLQLCShowManagerCurrentShow, QString::number(m_currentShow->id()));
+        /* Kept for the workspaces saved before the per Show zoom levels */
+        doc->writeAttribute(KXMLQLCShowManagerTimeScale, QString::number(m_timeScale));
+    }
+
+    for (auto it = m_showTimeScales.constBegin(); it != m_showTimeScales.constEnd(); ++it)
+    {
+        doc->writeStartElement(KXMLQLCShowManagerShowZoom);
+        doc->writeAttribute(KXMLQLCShowManagerShowID, QString::number(it.key()));
+        doc->writeAttribute(KXMLQLCShowManagerTimeScale, QString::number(it.value()));
+        doc->writeEndElement();
+    }
+
     doc->writeEndElement();
 
     return true;
@@ -4781,20 +4806,46 @@ bool ShowManager::loadXML(QXmlStreamReader &root)
     }
 
     QXmlStreamAttributes attrs = root.attributes();
-    root.skipCurrentElement();
-
-    /* Ignore a reference to a missing Function or to one that is not a Show */
     bool ok = false;
+
+    /* The zoom level of each Show. Read them before opening the current
+       Show, so that it opens at its own one */
+    m_showTimeScales.clear();
+    while (root.readNextStartElement())
+    {
+        if (root.name() == KXMLQLCShowManagerShowZoom)
+        {
+            QXmlStreamAttributes zoomAttrs = root.attributes();
+            bool idOk = false;
+            quint32 id = zoomAttrs.value(KXMLQLCShowManagerShowID).toUInt(&idOk);
+            float timeScale = zoomAttrs.value(KXMLQLCShowManagerTimeScale).toFloat(&ok);
+            /* Ignore a reference to a missing Function or to one that is not a Show */
+            if (idOk && ok && timeScale > 0 && qobject_cast<Show *>(m_doc->function(id)) != nullptr)
+                m_showTimeScales[id] = qBound(SHOWMGR_MIN_TIME_SCALE, timeScale, SHOWMGR_MAX_TIME_SCALE);
+        }
+        else
+        {
+            qWarning() << Q_FUNC_INFO << "Unknown Show Manager tag:" << root.name();
+        }
+        root.skipCurrentElement();
+    }
+
     quint32 showID = attrs.value(KXMLQLCShowManagerCurrentShow).toUInt(&ok);
     if (ok == false || qobject_cast<Show *>(m_doc->function(showID)) == nullptr)
         return true;
 
-    /* This also applies the default time scale of the Show time division */
-    setCurrentShowID(showID);
+    /* A workspace saved before the per Show zoom levels has the zoom
+       level of the current Show only */
+    if (m_showTimeScales.contains(showID) == false)
+    {
+        float timeScale = attrs.value(KXMLQLCShowManagerTimeScale).toFloat(&ok);
+        if (ok && timeScale > 0)
+            m_showTimeScales[showID] = qBound(SHOWMGR_MIN_TIME_SCALE, timeScale, SHOWMGR_MAX_TIME_SCALE);
+    }
 
-    float timeScale = attrs.value(KXMLQLCShowManagerTimeScale).toFloat(&ok);
-    if (ok && timeScale > 0)
-        setTimeScale(timeScale);
+    /* This applies the zoom level of the Show, or the default one of its
+       time division */
+    setCurrentShowID(showID);
 
     return true;
 }

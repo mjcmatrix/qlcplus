@@ -252,6 +252,10 @@ private:
     /** The current time scale of the Show Manager timeline */
     float m_timeScale;
 
+    /** The time scale last used on each Show, by Show ID, so that
+     *  every Show reopens at its own zoom level */
+    QMap<quint32, float> m_showTimeScales;
+
     /** Size in pixels of the Show Manager time division */
     float m_tickSize;
 
@@ -1032,7 +1036,7 @@ private:
      *********************************************************************/
 public:
     /** Save the Show Manager view state (the Show being edited and
-     *  the timeline zoom level) to the workspace XML */
+     *  the timeline zoom level of each Show) to the workspace XML */
     bool saveXML(QXmlStreamWriter *doc) const;
 
     /** Restore the Show Manager view state from the workspace XML.
