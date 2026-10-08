@@ -38,6 +38,27 @@
 #include "doc.h"
 #include "showrunner_test.h"
 
+/* An Audio standing in for one whose output takes a while to be heard */
+class OutputWaitStub final : public Function
+{
+public:
+    OutputWaitStub(Doc *doc) : Function(doc, Function::AudioType) {}
+
+    bool isWaitingForOutput() const override
+    {
+        return m_waiting && isRunning();
+    }
+
+    void preRun(MasterTimer *timer) override
+    {
+        m_preRuns++;
+        Function::preRun(timer);
+    }
+
+    bool m_waiting = true;
+    int m_preRuns = 0;
+};
+
 void ShowRunner_Test::initTestCase()
 {
     m_doc = new Doc(this);
@@ -877,6 +898,80 @@ void ShowRunner_Test::liveFirstTempoSection()
     stopShow(show);
 
     m_doc->inputOutputMap()->setBeatGeneratorType(InputOutputMap::Disabled);
+}
+
+void ShowRunner_Test::outputHoldStopsEndingItem()
+{
+    // an item ending exactly where an Audio begins is stopped when the
+    // Show is held for the Audio, while an item spanning both is frozen
+    Scene *ending = createScene();
+    Scene *spanning = createScene();
+    OutputWaitStub *audio = new OutputWaitStub(m_doc);
+    m_doc->addFunction(audio);
+
+    Show *show = createLiveShow();
+    addLiveItem(show, ending->id(), 0, 400, 0);
+    addLiveItem(show, spanning->id(), 0, 2000, 1);
+    addLiveItem(show, audio->id(), 400, 1000, 2);
+
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    for (int i = 0; i < 100 && audio->isRunning() == false; i++)
+        m_doc->masterTimer()->timerTick();
+    QVERIFY(audio->isRunning());
+    QVERIFY(show->m_runner->m_outputHold);
+    quint32 heldTime = showTime(show);
+    QCOMPARE(heldTime, quint32(400));
+
+    m_doc->masterTimer()->timerTick();
+    m_doc->masterTimer()->timerTick();
+    QVERIFY(show->m_runner->m_outputHold);
+    QCOMPARE(showTime(show), heldTime);
+    QVERIFY(ending->isRunning() == false);
+    QVERIFY(show->m_runner->m_holdPausedFunctions.contains(ending->id()) == false);
+    QVERIFY(spanning->isRunning());
+    QVERIFY(spanning->isPaused());
+
+    // the Audio is heard: the Show goes on
+    audio->m_waiting = false;
+    m_doc->masterTimer()->timerTick();
+    m_doc->masterTimer()->timerTick();
+    QVERIFY(show->m_runner->m_outputHold == false);
+    QVERIFY(spanning->isPaused() == false);
+    QVERIFY(showTime(show) > heldTime);
+    QVERIFY(ending->isRunning() == false);
+
+    stopShow(show);
+    QVERIFY(spanning->isRunning() == false);
+    QVERIFY(audio->isRunning() == false);
+}
+
+void ShowRunner_Test::outputHoldRestartsSameAudio()
+{
+    // an Audio item ending exactly where another item of the same Audio
+    // begins: the Audio is stopped and started again, as any other Function
+    OutputWaitStub *audio = new OutputWaitStub(m_doc);
+    audio->m_waiting = false;
+    m_doc->addFunction(audio);
+
+    Show *show = createLiveShow();
+    addLiveItem(show, audio->id(), 0, 400, 0);
+    addLiveItem(show, audio->id(), 400, 400, 0);
+
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    QVERIFY(tickTo(show, 200));
+    QCOMPARE(audio->m_preRuns, 1);
+
+    audio->m_waiting = true;
+    QVERIFY(tickTo(show, 380));
+    for (int i = 0; i < 10 && show->m_runner->m_outputHold == false; i++)
+        m_doc->masterTimer()->timerTick();
+    QVERIFY(show->m_runner->m_outputHold);
+    m_doc->masterTimer()->timerTick();
+    QVERIFY(audio->isRunning());
+    QCOMPARE(audio->m_preRuns, 2);
+
+    audio->m_waiting = false;
+    stopShow(show);
 }
 
 QTEST_GUILESS_MAIN(ShowRunner_Test)

@@ -241,29 +241,7 @@ void ShowRunner::write(MasterTimer *timer)
     // exactly where another item of the same Function begins, the Function
     // is stopped and started again (MasterTimer restarts it cleanly),
     // instead of the start being ignored and the stop winning.
-    // It is done in reverse order for two reasons:
-    // 1- m_runningQueue is not ordered by stop time
-    // 2- to avoid messing up with indices when an entry is removed
-    for (int i = m_runningQueue.count() - 1; i >= 0; i--)
-    {
-        RunningItem item = m_runningQueue.at(i);
-        Function *func = m_doc->function(item.functionId);
-        if (func == NULL)
-        {
-            m_runningQueue.removeAt(i);
-            continue;
-        }
-
-        // if we passed the function stop time
-        if (currentTime(func) >= item.stopTime)
-        {
-            // remove it from the running queue
-            m_runningQueue.removeAt(i);
-            // and stop it, unless another item still needs it running
-            if (isQueued(item.functionId) == false)
-                func->stop(functionParent());
-        }
-    }
+    stopEndedItems();
 
     // Phase 2. Check all the Functions that need to be started
     // m_timeFunctions is ordered by startup time, so when we found an entry
@@ -624,9 +602,36 @@ void ShowRunner::setItemStarted(ShowFunction *sf)
  * Output hold
  ************************************************************************/
 
+void ShowRunner::stopEndedItems()
+{
+    // It is done in reverse order for two reasons:
+    // 1- m_runningQueue is not ordered by stop time
+    // 2- to avoid messing up with indices when an entry is removed
+    for (int i = m_runningQueue.count() - 1; i >= 0; i--)
+    {
+        RunningItem item = m_runningQueue.at(i);
+        Function *func = m_doc->function(item.functionId);
+        if (func == NULL)
+        {
+            m_runningQueue.removeAt(i);
+            continue;
+        }
+
+        // if we passed the function stop time
+        if (currentTime(func) >= item.stopTime)
+        {
+            // remove it from the running queue
+            m_runningQueue.removeAt(i);
+            // and stop it, unless another item still needs it running
+            if (isQueued(item.functionId) == false)
+                func->stop(functionParent());
+        }
+    }
+}
+
 bool ShowRunner::startOutputHold()
 {
-    bool started = false;
+    QList<ShowFunction *> dueAudio;
 
     for (int i = m_currentTimeFunctionIndex; i < m_timeFunctions.count(); i++)
     {
@@ -639,6 +644,23 @@ bool ShowRunner::startOutputHold()
             m_preStartedItems.contains(sf->id()))
             continue;
 
+        dueAudio.append(sf);
+    }
+
+    if (dueAudio.isEmpty())
+        return false;
+
+    // Items ending right where the Audio begins are over: stop them now,
+    // as write() would have done, rather than freezing them for the hold
+    // and stopping them only after it
+    stopEndedItems();
+
+    foreach (ShowFunction *sf, dueAudio)
+    {
+        Function *f = m_doc->function(sf->functionID());
+        if (f == nullptr)
+            continue;
+
         if (isQueued(f->id()) == false)
         {
             requestTrackIntensity(sf, f);
@@ -647,11 +669,7 @@ bool ShowRunner::startOutputHold()
         m_runningQueue.append({ sf->id(), f->id(), sf->startTime() + sf->duration(m_doc) });
         setItemStarted(sf);
         m_preStartedItems.insert(sf->id());
-        started = true;
     }
-
-    if (started == false)
-        return false;
 
     // freeze what is already running (e.g. a Chaser spanning two songs), so
     // it doesn't run ahead either. Audio and Video keep their own clock.

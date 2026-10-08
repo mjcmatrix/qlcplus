@@ -163,6 +163,9 @@ private:
      * Output hold
      ************************************************************************/
 private:
+    /** Stop the Functions of the items that have reached their end */
+    void stopEndedItems();
+
     /** Start the Audio items due at m_elapsedTime ahead of everything else
      *  and hold the Show until they are actually heard (an audio device can
      *  take hundreds of ms to wake up). Returns true if a hold began */
