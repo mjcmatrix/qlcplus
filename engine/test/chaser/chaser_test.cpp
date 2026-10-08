@@ -30,6 +30,8 @@
 #include "chaserstep.h"
 #include "collection.h"
 #include "function.h"
+#include "genericfader.h"
+#include "inputoutputmap.h"
 #include "fixture.h"
 #include "universe.h"
 #include "chaser.h"
@@ -1029,6 +1031,200 @@ void Chaser_Test::postRun()
     // The chaser has no steps so ChaserRunner::postrun() shouldn't do much
     c->postRun(&timer, ua);
     QCOMPARE(c->isRunning(), false); // Make sure Function::postRun() is called
+}
+
+/* Run one MasterTimer tick, then let the Universe process its faders */
+static void tickAndFade(MasterTimer *timer, Doc *doc)
+{
+    timer->timerTick();
+    QList<Universe *> ua = doc->inputOutputMap()->claimUniverses();
+    ua[0]->processFaders(MasterTimer::tick());
+    doc->inputOutputMap()->releaseUniverses(false);
+}
+
+static uchar universeValue(Doc *doc, int address)
+{
+    QList<Universe *> ua = doc->inputOutputMap()->claimUniverses();
+    uchar value = uchar(ua[0]->preGMValues()[address]);
+    doc->inputOutputMap()->releaseUniverses(false);
+    return value;
+}
+
+static int pausedFadersCount(Doc *doc)
+{
+    int count = 0;
+    QList<Universe *> ua = doc->inputOutputMap()->claimUniverses();
+    foreach (QSharedPointer<GenericFader> fader, ua[0]->faders())
+    {
+        if (!fader.isNull() && fader->isPaused())
+            count++;
+    }
+    doc->inputOutputMap()->releaseUniverses(false);
+    return count;
+}
+
+/* A single shot, two steps Chaser, each step on its own channel, with a
+   common fade out longer than a step, so that the previous step is still
+   fading out while the next one is running */
+static Chaser *createFadeOutChaser(Doc *doc, Scene **s1, Scene **s2)
+{
+    Fixture *fxi = new Fixture(doc);
+    fxi->setAddress(0);
+    fxi->setUniverse(0);
+    fxi->setChannels(2);
+    doc->addFixture(fxi);
+
+    Chaser *c = new Chaser(doc);
+    c->setDuration(MasterTimer::tick() * 10);
+    c->setFadeOutMode(Chaser::Common);
+    c->setFadeOutSpeed(MasterTimer::tick() * 20);
+    c->setRunOrder(Function::SingleShot);
+    doc->addFunction(c);
+
+    *s1 = new Scene(doc);
+    (*s1)->setValue(fxi->id(), 0, 255);
+    doc->addFunction(*s1);
+    c->addStep((*s1)->id());
+
+    *s2 = new Scene(doc);
+    (*s2)->setValue(fxi->id(), 1, 255);
+    doc->addFunction(*s2);
+    c->addStep((*s2)->id());
+
+    return c;
+}
+
+/* Run the Chaser until its second step has been running for a few ticks,
+   leaving the first step fading out */
+static void runToSecondStep(MasterTimer *timer, Doc *doc, Chaser *c, Scene *s2)
+{
+    c->start(timer, FunctionParent::master());
+    for (int i = 0; i < 100 && s2->isRunning() == false; i++)
+        tickAndFade(timer, doc);
+    for (int i = 0; i < 3; i++)
+        tickAndFade(timer, doc);
+}
+
+void Chaser_Test::pauseResumeFadingOutStep()
+{
+    Scene *s1, *s2;
+    Chaser *c = createFadeOutChaser(m_doc, &s1, &s2);
+    MasterTimer timer(m_doc);
+
+    runToSecondStep(&timer, m_doc, c, s2);
+    QVERIFY(s1->isRunning() == false);
+    uchar fading = universeValue(m_doc, 0);
+    QVERIFY(fading > 0 && fading < 255);
+
+    // the fade out of the previous step is frozen while paused
+    c->setPause(true);
+    tickAndFade(&timer, m_doc);
+    fading = universeValue(m_doc, 0);
+    for (int i = 0; i < 5; i++)
+        tickAndFade(&timer, m_doc);
+    QCOMPARE(universeValue(m_doc, 0), fading);
+    QVERIFY(pausedFadersCount(m_doc) > 0);
+
+    // and completes when resumed
+    c->setPause(false);
+    for (int i = 0; i < 30; i++)
+        tickAndFade(&timer, m_doc);
+    QCOMPARE(universeValue(m_doc, 0), uchar(0));
+    QCOMPARE(pausedFadersCount(m_doc), 0);
+
+    c->stop(FunctionParent::master());
+    tickAndFade(&timer, m_doc);
+}
+
+void Chaser_Test::pauseThenResumeAndStop()
+{
+    Scene *s1, *s2;
+    Chaser *c = createFadeOutChaser(m_doc, &s1, &s2);
+    MasterTimer timer(m_doc);
+
+    runToSecondStep(&timer, m_doc, c, s2);
+    c->setPause(true);
+    tickAndFade(&timer, m_doc);
+    QVERIFY(pausedFadersCount(m_doc) > 0);
+
+    // resumed and stopped before the resume request is processed,
+    // as a Show does when releasing a hold on an item that has ended
+    c->setPause(false);
+    c->stop(FunctionParent::master());
+    for (int i = 0; i < 40; i++)
+        tickAndFade(&timer, m_doc);
+
+    QVERIFY(c->isRunning() == false);
+    QCOMPARE(pausedFadersCount(m_doc), 0);
+    QCOMPARE(universeValue(m_doc, 0), uchar(0));
+    QCOMPARE(universeValue(m_doc, 1), uchar(0));
+}
+
+void Chaser_Test::pauseOnStepChange()
+{
+    Scene *s1, *s2;
+    Chaser *c = createFadeOutChaser(m_doc, &s1, &s2);
+    MasterTimer timer(m_doc);
+
+    // count the ticks until the second step starts
+    int stepTicks = 0;
+    c->start(&timer, FunctionParent::master());
+    while (s2->isRunning() == false && stepTicks < 100)
+    {
+        tickAndFade(&timer, m_doc);
+        stepTicks++;
+    }
+    c->stop(FunctionParent::master());
+    for (int i = 0; i < 40; i++)
+        tickAndFade(&timer, m_doc);
+    QVERIFY(c->isRunning() == false);
+
+    // run again and get the pause processed on the tick the step ends
+    c->start(&timer, FunctionParent::master());
+    for (int i = 0; i < stepTicks - 1; i++)
+        tickAndFade(&timer, m_doc);
+    QVERIFY(s1->isRunning() == true);
+    c->setPause(true);
+    tickAndFade(&timer, m_doc);
+
+    // a paused Chaser doesn't advance
+    QVERIFY(s1->isRunning() == true);
+    QVERIFY(s2->isRunning() == false);
+
+    c->setPause(false);
+    tickAndFade(&timer, m_doc);
+    QVERIFY(s2->isRunning() == true);
+
+    c->stop(FunctionParent::master());
+    for (int i = 0; i < 40; i++)
+        tickAndFade(&timer, m_doc);
+    QCOMPARE(pausedFadersCount(m_doc), 0);
+    QCOMPARE(universeValue(m_doc, 0), uchar(0));
+    QCOMPARE(universeValue(m_doc, 1), uchar(0));
+}
+
+void Chaser_Test::pausedFadingSceneDeleted()
+{
+    Scene *s1, *s2;
+    Chaser *c = createFadeOutChaser(m_doc, &s1, &s2);
+    MasterTimer timer(m_doc);
+
+    runToSecondStep(&timer, m_doc, c, s2);
+    c->setPause(true);
+    tickAndFade(&timer, m_doc);
+    QVERIFY(pausedFadersCount(m_doc) > 0);
+
+    // the Scene still fading out is deleted while the Chaser is paused
+    QVERIFY(m_doc->deleteFunction(s1->id()) == true);
+
+    c->setPause(false);
+    for (int i = 0; i < 30; i++)
+        tickAndFade(&timer, m_doc);
+    QCOMPARE(pausedFadersCount(m_doc), 0);
+    QCOMPARE(universeValue(m_doc, 0), uchar(0));
+
+    c->stop(FunctionParent::master());
+    tickAndFade(&timer, m_doc);
 }
 
 void Chaser_Test::adjustIntensity()

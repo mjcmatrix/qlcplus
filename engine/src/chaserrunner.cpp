@@ -733,13 +733,32 @@ void ChaserRunner::setPause(bool enable, QList<Universe *> universes)
         step->m_function->setPause(enable);
 
     // there might be a Scene fading out, so request pause
-    // to faders bound to the Scene ID running on universes
-    Function *f = m_doc->function(m_lastFunctionID);
-    if (f != NULL && f->type() == Function::SceneType)
+    // to faders bound to the Scene ID running on universes.
+    // Remember the IDs, so that exactly those faders are released
+    // even if the Scene has been deleted in the meantime
+    if (enable)
+    {
+        if (m_lastFunctionID != Function::invalidId())
+        {
+            foreach (Universe *universe, universes)
+                universe->setFaderPause(m_lastFunctionID, true);
+            m_pausedFadersIDs.insert(m_lastFunctionID);
+        }
+    }
+    else
+    {
+        releasePausedFaders(universes);
+    }
+}
+
+void ChaserRunner::releasePausedFaders(QList<Universe *> universes)
+{
+    foreach (quint32 fid, m_pausedFadersIDs)
     {
         foreach (Universe *universe, universes)
-            universe->setFaderPause(m_lastFunctionID, enable);
+            universe->setFaderPause(fid, false);
     }
+    m_pausedFadersIDs.clear();
 }
 
 FunctionParent ChaserRunner::functionParent() const
@@ -777,6 +796,13 @@ bool ChaserRunner::write(MasterTimer *timer, QList<Universe *> universes)
         break;
         case ChaserPauseRequest:
             setPause(m_pendingAction.m_fadeMode ? true : false, universes);
+            // a paused Chaser doesn't advance, not even on the tick
+            // the pause is processed
+            if (m_pendingAction.m_fadeMode)
+            {
+                m_pendingAction.m_action = ChaserNoAction;
+                return true;
+            }
         break;
         default:
         break;
@@ -848,9 +874,13 @@ bool ChaserRunner::write(MasterTimer *timer, QList<Universe *> universes)
 
 void ChaserRunner::postRun(MasterTimer *timer, QList<Universe*> universes)
 {
-    Q_UNUSED(universes);
     Q_UNUSED(timer);
 
     qDebug() << Q_FUNC_INFO;
+
+    // The Chaser may be stopped while paused, or before a pending
+    // resume request has been processed: never leave faders paused,
+    // since nothing would ever resume them
+    releasePausedFaders(universes);
     clearRunningList();
 }

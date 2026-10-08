@@ -24,6 +24,7 @@
 
 #include <QList>
 #include <QMap>
+#include <QSet>
 
 #include "function.h"
 #include "chaseraction.h"
@@ -158,6 +159,7 @@ private:
     ChaserAction m_pendingAction;           //! Action to be performed on steps at the next write call
     int m_lastRunStepIdx;                   //! Index of the last step ran
     quint32 m_lastFunctionID;               //! ID of the last Function ran (Scene only)
+    QSet<quint32> m_pausedFadersIDs;        //! IDs of the Scenes whose faders have been paused
     QElapsedTimer *m_roundTime;             //! Counts the time between steps
     QVector<int> m_order;                   //! Array of step indices in a randomized order
 
@@ -212,6 +214,12 @@ public:
 
     /** If running, pauses the runner and all the current running steps. */
     void setPause(bool enable, QList<Universe *> universes);
+
+private:
+    /** Resume the faders paused by setPause() */
+    void releasePausedFaders(QList<Universe *> universes);
+
+public:
 
     /**
      * Perform postRun operations. Call this from the parent function's postRun().
