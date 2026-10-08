@@ -68,6 +68,9 @@ private slots:
     void liveFirstTempoSection();
     void tempoMapStepEndsWithItem();
 
+    void outputHoldStopsEndingItem();
+    void outputHoldRestartsSameAudio();
+
 private:
     Scene *createScene();
     Show *createShow(quint32 fid1, quint32 start1, quint32 fid2, quint32 start2, bool sameTrack);
