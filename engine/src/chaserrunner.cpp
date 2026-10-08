@@ -585,8 +585,12 @@ void ChaserRunner::clearRunningList()
     {
         if (step->m_function)
         {
-            // restore the original Function fade out time
-            step->m_function->setOverrideFadeOutSpeed(stepFadeOut(step->m_index));
+            // restore the original Function fade out time. A step run on
+            // the tempo map was started with a Time tempo, so in ms
+            uint fadeOut = stepFadeOut(step->m_index);
+            if (hasTempoMapClock())
+                fadeOut = clockSpeedToTime(fadeOut, m_clockTime);
+            step->m_function->setOverrideFadeOutSpeed(fadeOut);
             step->m_function->stop(functionParent(), m_chaser->type() == Function::SequenceType);
             m_lastFunctionID = step->m_function->type() == Function::SceneType ? step->m_function->id() : Function::invalidId();
         }
@@ -870,13 +874,32 @@ void ChaserRunner::setPause(bool enable, QList<Universe *> universes)
         step->m_function->setPause(enable);
 
     // there might be a Scene fading out, so request pause
-    // to faders bound to the Scene ID running on universes
-    Function *f = m_doc->function(m_lastFunctionID);
-    if (f != NULL && f->type() == Function::SceneType)
+    // to faders bound to the Scene ID running on universes.
+    // Remember the IDs, so that exactly those faders are released
+    // even if the Scene has been deleted in the meantime
+    if (enable)
+    {
+        if (m_lastFunctionID != Function::invalidId())
+        {
+            foreach (Universe *universe, universes)
+                universe->setFaderPause(m_lastFunctionID, true);
+            m_pausedFadersIDs.insert(m_lastFunctionID);
+        }
+    }
+    else
+    {
+        releasePausedFaders(universes);
+    }
+}
+
+void ChaserRunner::releasePausedFaders(QList<Universe *> universes)
+{
+    foreach (quint32 fid, m_pausedFadersIDs)
     {
         foreach (Universe *universe, universes)
-            universe->setFaderPause(m_lastFunctionID, enable);
+            universe->setFaderPause(fid, false);
     }
+    m_pausedFadersIDs.clear();
 }
 
 FunctionParent ChaserRunner::functionParent() const
@@ -895,6 +918,11 @@ bool ChaserRunner::write(MasterTimer *timer, QList<Universe *> universes)
         m_orderRefreshNeeded = false;
         fillOrder();
     }
+
+    // a step started by a pending action, before the running steps are
+    // advanced below. It must not be advanced in the same write, as a step
+    // started after them isn't, or it would run a tick ahead
+    ChaserRunnerStep *startedStep = NULL;
 
     switch (m_pendingAction.m_action)
     {
@@ -917,11 +945,20 @@ bool ChaserRunner::write(MasterTimer *timer, QList<Universe *> universes)
                 qDebug() << "[ChaserRunner] Starting from step" << m_lastRunStepIdx << "@ offset" << m_startOffset;
                 startNewStep(m_lastRunStepIdx, timer, m_pendingAction.m_masterIntensity,
                              m_pendingAction.m_stepIntensity, m_pendingAction.m_fadeMode);
+                if (m_runnerSteps.isEmpty() == false)
+                    startedStep = m_runnerSteps.last();
                 emit currentStepChanged(m_lastRunStepIdx);
             }
         break;
         case ChaserPauseRequest:
             setPause(m_pendingAction.m_fadeMode ? true : false, universes);
+            // a paused Chaser doesn't advance, not even on the tick
+            // the pause is processed
+            if (m_pendingAction.m_fadeMode)
+            {
+                m_pendingAction.m_action = ChaserNoAction;
+                return true;
+            }
         break;
         default:
         break;
@@ -931,13 +968,20 @@ bool ChaserRunner::write(MasterTimer *timer, QList<Universe *> universes)
 
     foreach (ChaserRunnerStep *step, m_runnerSteps)
     {
+        if (step == startedStep)
+            continue;
+
         bool stepDone = false;
 
         if (hasTempoMapClock())
         {
-            // end the step on the tick nearest to its exact end time
+            // end the step on the first tick at or after its exact end
+            // time, as a Show ends its items: a step ending with the item
+            // that runs the Chaser must not start the next one a tick
+            // before the item is stopped. Half a ms absorbs the rounding
+            // of the step end time
             stepDone = step->m_endTime >= 0 &&
-                       m_clockTime + (MasterTimer::tick() / 2.0) >= step->m_endTime;
+                       m_clockTime + 0.5 >= step->m_endTime;
             if (stepDone)
                 m_nextStepStart = step->m_endTime;
         }
@@ -1009,9 +1053,13 @@ bool ChaserRunner::write(MasterTimer *timer, QList<Universe *> universes)
 
 void ChaserRunner::postRun(MasterTimer *timer, QList<Universe*> universes)
 {
-    Q_UNUSED(universes);
     Q_UNUSED(timer);
 
     qDebug() << Q_FUNC_INFO;
+
+    // The Chaser may be stopped while paused, or before a pending
+    // resume request has been processed: never leave faders paused,
+    // since nothing would ever resume them
+    releasePausedFaders(universes);
     clearRunningList();
 }

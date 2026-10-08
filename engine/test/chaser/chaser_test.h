@@ -57,6 +57,10 @@ private slots:
     void writeHTP();
     void writeLTP();
     void postRun();
+    void pauseResumeFadingOutStep();
+    void pauseThenResumeAndStop();
+    void pauseOnStepChange();
+    void pausedFadingSceneDeleted();
     void adjustIntensity();
 
     void quickChaser();
