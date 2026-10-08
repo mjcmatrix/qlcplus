@@ -879,4 +879,44 @@ void ShowRunner_Test::liveFirstTempoSection()
     m_doc->inputOutputMap()->setBeatGeneratorType(InputOutputMap::Disabled);
 }
 
+void ShowRunner_Test::tempoMapStepEndsWithItem()
+{
+    // a Beats tempo Chaser item, on the tempo grid but not on a tick,
+    // ending exactly where a step ends: the Chaser is stopped with the item,
+    // without starting its next step for a tick before
+    Scene *s1 = createScene();
+    Scene *s2 = createScene();
+    Chaser *chaser = new Chaser(m_doc);
+    chaser->setTempoType(Function::Beats);
+    chaser->setRunOrder(Function::Loop);
+    chaser->setDurationMode(Chaser::Common);
+    chaser->setDuration(1000);
+    m_doc->addFunction(chaser);
+    chaser->addStep(s1->id());
+    chaser->addStep(s2->id());
+
+    Show *show = createLiveShow();
+    TempoMap map;
+    // the item ends 3 ms after a tick, the case where a step ending on the
+    // tick nearest to its end time was ended a tick before the item
+    map.addSection(TempoSection(3, 60000, 120, 4, "Song"));
+    show->setTempoMap(map);
+    addLiveItem(show, chaser->id(), 1003, 1000, 0);
+    addLiveItem(show, createScene()->id(), 0, 4000, 1);
+
+    int s1Starts = 0;
+    bool wasRunning = false;
+    show->start(m_doc->masterTimer(), FunctionParent::master());
+    for (int i = 0; i < 150; i++)
+    {
+        m_doc->masterTimer()->timerTick();
+        if (s1->isRunning() && wasRunning == false)
+            s1Starts++;
+        wasRunning = s1->isRunning();
+    }
+    QVERIFY(chaser->isRunning() == false);
+    QCOMPARE(s1Starts, 1);
+    stopShow(show);
+}
+
 QTEST_GUILESS_MAIN(ShowRunner_Test)

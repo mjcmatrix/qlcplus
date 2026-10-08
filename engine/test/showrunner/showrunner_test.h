@@ -66,6 +66,7 @@ private slots:
     void liveMuteTrack();
     void liveTempoMapEdit();
     void liveFirstTempoSection();
+    void tempoMapStepEndsWithItem();
 
 private:
     Scene *createScene();
