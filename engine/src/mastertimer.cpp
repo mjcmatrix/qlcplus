@@ -170,6 +170,12 @@ void MasterTimer::timerTick()
     timerTickFunctions(universes);
     timerTickDMXSources(universes);
 
+    // Wake the universe threads from here: they are owned by the GUI thread,
+    // so a queued call would wait for its event loop and a busy UI would
+    // delay the DMX output. The claimed universes can't be removed meanwhile
+    foreach (Universe *universe, universes)
+        universe->tick();
+
     doc->inputOutputMap()->releaseUniverses();
 
     m_beatRequested = false;
