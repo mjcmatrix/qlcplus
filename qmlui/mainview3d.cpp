@@ -22,6 +22,7 @@
 #include <QTexture>
 #include <QPainter>
 #include <QQuickItem>
+#include <QQuickWindow>
 #include <QTimer>
 #include <QQmlContext>
 #include <QQmlComponent>
@@ -96,6 +97,7 @@ MainView3D::MainView3D(QQuickView *view, Doc *doc, QObject *parent)
     , m_sceneRootEntity(nullptr)
     , m_quadEntity(nullptr)
     , m_gBuffer(nullptr)
+    , m_framePacer(new FramePacer3D(this))
     , m_latestGenericID(0)
     , m_initRetryCount(0)
     , m_genericPreviousIndex(-1)
@@ -118,6 +120,8 @@ MainView3D::MainView3D(QQuickView *view, Doc *doc, QObject *parent)
     m_stagesList << tr("Simple ground") << tr("Simple box") << tr("Rock stage") << tr("Theatre stage");
     m_stageResourceList << "qrc:/StageSimple.qml" << "qrc:/StageBox.qml" << "qrc:/StageRock.qml" << "qrc:/StageTheatre.qml";
 
+    connect(m_framePacer, &FramePacer3D::applyChanges, this, &MainView3D::slotApplyPendingUpdates);
+
     m_genericItemsList = new ListModel(this);
     QStringList listRoles;
     listRoles << "itemID" << "name" << "isSelected" << "isLocked";
@@ -138,6 +142,8 @@ void MainView3D::enableContext(bool enable)
     PreviewContext::enableContext(enable);
     if (enable == false)
     {
+        m_framePacer->attach(nullptr);
+        m_pendingUpdates.clear();
         resetItems();
         m_scene3D = nullptr;
         m_scene3DEntity = nullptr;
@@ -603,6 +609,8 @@ bool MainView3D::initialize3DProperties()
     }
 
     m_initRetryCount = 0;
+
+    m_framePacer->attach(m_scene3D->window());
 
     // re-attach the FPS counter if the user had it enabled: the previous
     // QFrameAction (if any) was destroyed together with the old scene root
@@ -1548,12 +1556,46 @@ void MainView3D::updateFixture(Fixture *fixture, QByteArray &previous)
     if (m_enabled == false || fixture == nullptr)
         return;
 
+    if (m_framePacer->isActive())
+    {
+        /* Keep the values from before the first held back change: the
+           current ones are read from the fixture when the update is
+           applied. An empty array means "everything changed", so it wins */
+        auto it = m_pendingUpdates.find(fixture->id());
+        if (it == m_pendingUpdates.end())
+            m_pendingUpdates.insert(fixture->id(), previous);
+        else if (previous.isEmpty())
+            it->clear();
+        return;
+    }
+
     for (quint32 &subID : m_monProps->fixtureIDList(fixture->id()))
     {
         quint16 headIndex = m_monProps->fixtureHeadIndex(subID);
         quint16 linkedIndex = m_monProps->fixtureLinkedIndex(subID);
         updateFixtureItem(fixture, headIndex, linkedIndex, previous);
     }
+}
+
+void MainView3D::slotApplyPendingUpdates()
+{
+    QHash<quint32, QByteArray> updates;
+    updates.swap(m_pendingUpdates);
+    for (auto it = updates.cbegin(); it != updates.cend(); ++it)
+    {
+        Fixture *fixture = m_doc->fixture(it.key());
+        if (fixture == nullptr)
+            continue;
+
+        for (quint32 &subID : m_monProps->fixtureIDList(fixture->id()))
+        {
+            quint16 headIndex = m_monProps->fixtureHeadIndex(subID);
+            quint16 linkedIndex = m_monProps->fixtureLinkedIndex(subID);
+            updateFixtureItem(fixture, headIndex, linkedIndex, it.value());
+        }
+    }
+
+    emit sceneUpdateAllowed();
 }
 
 void MainView3D::updateFixtureItem(Fixture *fixture, quint16 headIndex, quint16 linkedIndex, const QByteArray &previous)

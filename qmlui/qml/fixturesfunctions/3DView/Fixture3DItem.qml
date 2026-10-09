@@ -151,7 +151,7 @@ Entity
 
     property real lightIntensity: dimmerValue * shutterValue * lumensScale
     property real dimmerValue: 0
-    property real shutterValue: sAnimator.shutterValue
+    property real shutterValue: 1.0
     property color lightColor: Qt.rgba(0, 0, 0, 1)
     property vector3d lightPos: Qt.vector3d(0, 0, 0)
     property vector3d lightDir: Math3D.getLightDirection(transform, panTransform, tiltTransform)
@@ -179,7 +179,7 @@ Entity
         fixtureEntity.panMaxDegrees = maxDegrees
         if (meshType == MainView3D.ScannerMeshType)
         {
-            panRotation = 180 - (panMaxDegrees / 2)
+            live.pan = panRotation = 180 - (panMaxDegrees / 2)
             coneTopRadius = 0.01 * transform.scale3D.x
         }
         t.rotationY = Qt.binding(function() {
@@ -192,7 +192,7 @@ Entity
         console.log("Binding tilt ----")
         fixtureEntity.tiltTransform = t
         fixtureEntity.tiltMaxDegrees = maxDegrees
-        tiltRotation = maxDegrees / 2
+        live.tilt = tiltRotation = maxDegrees / 2
         t.rotationX = Qt.binding(function() {
             return tiltRotation
         })
@@ -247,7 +247,7 @@ Entity
             var panDeg = (panMaxDegrees / 0xFFFF) * pan
             var panTgtDeg = invertedPan ? basePanPos + panMaxDegrees - panDeg : basePanPos + panDeg
             panAnim.stop()
-            panAnim.from = panRotation
+            panAnim.from = live.pan
             panAnim.to = panTgtDeg
             // Physical slew time for this move: the fastest a real head could do it.
             var panPhysical = (panSpeed / panMaxDegrees) * Math.abs(panAnim.to - panAnim.from)
@@ -265,7 +265,7 @@ Entity
             else
                 tiltTgtDeg = invertedTilt ? -baseTiltPos + tiltDeg : baseTiltPos - tiltDeg
             tiltAnim.stop()
-            tiltAnim.from = tiltRotation
+            tiltAnim.from = live.tilt
             tiltAnim.to = tiltTgtDeg
             var tiltPhysical = (tiltSpeed / tiltMaxDegrees) * Math.abs(tiltAnim.to - tiltAnim.from)
             tiltAnim.duration = animationDuration(elapsed, tiltPhysical, oneShot)
@@ -348,18 +348,47 @@ Entity
             outDepthCone.destroy()
     }
 
+    /* The animations below run on these "live" values. The scene only sees
+       them when View3D lets it change (see FramePacer3D), so a slow GPU
+       redraws less often instead of holding up the whole UI. They live on a
+       plain QtObject: Qt 3D counts a change to any property of this entity
+       as a scene change */
+    QQ2.QtObject
+    {
+        id: live
+        property real pan: 0
+        property real tilt: 0
+        property real gobo: 0
+    }
+
+    QQ2.Connections
+    {
+        target: View3D
+        function onSceneUpdateAllowed()
+        {
+            fixtureEntity.panRotation = live.pan
+            fixtureEntity.tiltRotation = live.tilt
+            fixtureEntity.goboRotation = live.gobo
+            fixtureEntity.shutterValue = sAnimator.shutterValue
+        }
+    }
+
     ShutterAnimator { id: sAnimator }
 
-    QQ2.NumberAnimation on panRotation
+    QQ2.NumberAnimation
     {
         id: panAnim
+        target: live
+        property: "pan"
         running: false
         easing.type: QQ2.Easing.Linear
     }
 
-    QQ2.NumberAnimation on tiltRotation
+    QQ2.NumberAnimation
     {
         id: tiltAnim
+        target: live
+        property: "tilt"
         running: false
         easing.type: QQ2.Easing.Linear
     }
@@ -417,9 +446,11 @@ Entity
         }
     }
 
-    QQ2.NumberAnimation on goboRotation
+    QQ2.NumberAnimation
     {
         id: goboAnim
+        target: live
+        property: "gobo"
         running: false
         duration: 0
         easing.type: QQ2.Easing.Linear

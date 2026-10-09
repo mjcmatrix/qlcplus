@@ -37,6 +37,7 @@ set(SRC_FILES
     fixturemanager.cpp fixturemanager.h
     fixtureutils.cpp fixtureutils.h
     folderbrowser.cpp folderbrowser.h
+    framepacer3d.cpp framepacer3d.h
     functioneditor.cpp functioneditor.h
     functionmanager.cpp functionmanager.h
     importmanager.cpp importmanager.h

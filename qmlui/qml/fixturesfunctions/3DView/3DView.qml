@@ -64,7 +64,8 @@ Rectangle
         anchors.right: threeDSettings.visible ? threeDSettings.left : parent.right
         anchors.top: groupsBar.visible ? groupsBar.bottom : parent.top
         anchors.bottom: parent.bottom
-        aspects: ["input", "logic"]
+        // "qlcpacer" tells FramePacer3D when the scene changes
+        aspects: ["input", "logic", "qlcpacer"]
         /* The deferred renderer anti-aliases with FXAA in its last pass; a
            multisampled Scene3D framebuffer on top of it paid for the same
            edges twice */
