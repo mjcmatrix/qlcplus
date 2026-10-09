@@ -146,7 +146,7 @@ Entity
     /* ********************* Light properties ********************* */
     /* ****** These are bound to uniforms in ScreenQuadEntity ***** */
 
-    property real shutterValue: sAnimator.shutterValue
+    property real shutterValue: 1.0
     /* Luminous intensity of a single emitter of this fixture, in candela: the
        "Lumens" physical property of its mode spread over the solid angle of the
        beam at the widest the lens opens. 0 when the definition has no data */
@@ -188,7 +188,7 @@ Entity
         console.log("Binding tilt ----")
         fixtureEntity.tiltTransform = t
         fixtureEntity.tiltMaxDegrees = maxDegrees
-        tiltRotation = tiltRestOffset + (maxDegrees / 2)
+        live.tilt = tiltRotation = tiltRestOffset + (maxDegrees / 2)
         t.rotationX = Qt.binding(function() { return tiltRotation })
     }
 
@@ -376,7 +376,7 @@ Entity
             var baseTiltPos = tiltMaxDegrees / 2
             var tiltDeg = (tiltMaxDegrees / 0xFFFF) * tilt
             tiltAnim.stop()
-            tiltAnim.from = tiltRotation
+            tiltAnim.from = live.tilt
             tiltAnim.to = tiltRestOffset + (invertedTilt ? -baseTiltPos + tiltDeg : baseTiltPos - tiltDeg)
             var tiltPhysical = (tiltSpeed / tiltMaxDegrees) * Math.abs(tiltAnim.to - tiltAnim.from)
             tiltAnim.duration = animationDuration(elapsed, tiltPhysical, oneShot)
@@ -423,9 +423,32 @@ Entity
             cutoffAngle = (((((focusMaxDegrees - focusMinDegrees) / 255.0) * value) + focusMinDegrees) / 2.0) * (Math.PI / 180.0)
     }
 
-    NumberAnimation on tiltRotation
+    /* The tilt animation below and sAnimator run on "live" values of their
+       own. The scene only sees them when View3D lets it change (see
+       FramePacer3D), so a slow GPU redraws less often instead of holding up
+       the whole UI. They live on a plain QtObject: Qt 3D counts a change to
+       any property of this entity as a scene change */
+    QtObject
+    {
+        id: live
+        property real tilt: 0
+    }
+
+    Connections
+    {
+        target: View3D
+        function onSceneUpdateAllowed()
+        {
+            fixtureEntity.tiltRotation = live.tilt
+            fixtureEntity.shutterValue = sAnimator.shutterValue
+        }
+    }
+
+    NumberAnimation
     {
         id: tiltAnim
+        target: live
+        property: "tilt"
         running: false
         easing.type: Easing.Linear
     }

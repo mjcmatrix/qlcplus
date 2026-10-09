@@ -37,6 +37,7 @@
 #include <Qt3DRender/QPaintedTextureImage>
 
 #include "previewcontext.h"
+#include "framepacer3d.h"
 
 class Doc;
 class Fixture;
@@ -181,6 +182,11 @@ public slots:
     void slotRefreshView() override;
 
 signals:
+    /** The 3D scene may change on this frame: the 3D items copy the values
+     *  their animations have reached to the properties the scene uses.
+     *  See FramePacer3D */
+    void sceneUpdateAllowed();
+
     void cameraPositionChanged();
     void cameraUpVectorChanged();
     void cameraViewCenterChanged();
@@ -221,6 +227,10 @@ public:
 
 protected slots:
     void slotFrameProcessed();
+
+    /** Apply the fixture updates held back by updateFixture(), and let
+     *  the 3D items apply their animations (see sceneUpdateAllowed) */
+    void slotApplyPendingUpdates();
 
 private:
     /** Apply the FPS counter enabled state to the running scene (attach/detach
@@ -286,7 +296,9 @@ public:
 
     Q_INVOKABLE QString makeShader(QString str);
 
-    /** Update the fixture preview items when some channels have changed */
+    /** Update the fixture preview items when some channels have changed.
+     *  While the 3D view is paced, the update is held back until
+     *  FramePacer3D allows the scene to change */
     void updateFixture(Fixture *fixture, QByteArray &previous);
 
     /** Update a single fixture item for a specific Fixture ID, head index and linked index */
@@ -394,6 +406,14 @@ private:
 
     /** Reference to the render targets used for scattering */
     QRenderTarget *m_gBuffer;
+
+    /** Paces the 3D scene changes so its redraws can't starve the UI */
+    FramePacer3D *m_framePacer;
+
+    /** Fixture updates held back for FramePacer3D: Fixture ID and the
+     *  channel values from before the first held back change, which is
+     *  what updateFixtureItem() needs to detect what has changed */
+    QHash<quint32, QByteArray> m_pendingUpdates;
 
     /** Map of QLC+ item IDs and SceneItem references */
     QMap<quint32, SceneItem*> m_entitiesMap;

@@ -50,7 +50,7 @@ Entity
     property bool useShading: false
     property bool useScattering: false
     property bool useShadows: false
-    property real shutterValue: sAnimator.shutterValue
+    property real shutterValue: 1.0
     /* Luminous intensity of a single emitter of this fixture, in candela: the
        "Lumens" physical property of its mode spread over the solid angle of the
        beam at the widest the lens opens. 0 when the definition has no data */
@@ -96,6 +96,15 @@ Entity
     function setShutter(type, low, high)
     {
         sAnimator.setShutter(type, low, high)
+    }
+
+    /* sAnimator runs the strobe on its own value. The scene only sees it
+       when View3D lets it change (see FramePacer3D), so a slow GPU redraws
+       less often instead of holding up the whole UI */
+    QQ2.Connections
+    {
+        target: View3D
+        function onSceneUpdateAllowed() { fixtureEntity.shutterValue = sAnimator.shutterValue }
     }
 
     ShutterAnimator { id: sAnimator }
