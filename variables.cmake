@@ -46,7 +46,7 @@ endif()
 # deliberately left unsuffixed, since they are shared between the two.
 if(qmlui)
     add_definitions(-DQMLUI)
-    set(APPVERSION "5.3.0")
+    set(APPVERSION "5.3.1")
     set(APPBINARY "qlcplus5")
     set(PLUGINSUBDIR "qlcplus5")
 else()
