@@ -165,7 +165,22 @@ SidePanel
         {
             loaderSource = functionManager.getEditorResource(funcID)
             animatePanel(true)
+            funcManagerButton.checked = true
         }
+    }
+
+    // the editors are gone with the view: don't leave a stale editor in the engine
+    Component.onCompleted:
+    {
+        if (!inShowManager && functionManager.isEditing)
+            functionManager.setEditorFunction(-1, false, false)
+    }
+
+    // keep the toggle in sync with the drawer, whatever opened or closed it
+    onIsOpenChanged:
+    {
+        if (!isOpen)
+            funcManagerButton.checked = false
     }
 
     onContentLoaded: (item, ID) =>
