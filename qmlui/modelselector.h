@@ -36,8 +36,8 @@ public:
     ~ModelSelector();
 
     /** Add an entry to the selected items list.
-     *  If $multiSelection is false, every previous item in the list will be
-     *  deselected. */
+     *  With no $keyModifiers, every previous item in the list will be
+     *  deselected. With Ctrl, an item already selected is deselected. */
     Q_INVOKABLE void selectItem(int index, ListModel *model, int keyModifiers);
 
     /** Reset the currently active selection */
@@ -52,6 +52,7 @@ public:
 
 private:
     void selectSingleItem(int index, ListModel *model);
+    void deselectSingleItem(int index, ListModel *model);
 
 signals:
     void itemsCountChanged(int itemsCount);

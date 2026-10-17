@@ -298,7 +298,17 @@ Rectangle
                                             mcDragItem.z = 10
 
                                             if (model.isSelected)
+                                            {
+                                                // keep a selection for dragging, unless Ctrl deselects the channel
+                                                if ((mouse.modifiers & Qt.ControlModifier) == 0)
+                                                    return
+
+                                                modeChanSelector.selectItem(index, channelList.model, mouse.modifiers)
+                                                var dIdx = mcDragItem.itemsList.indexOf(mcDelegate)
+                                                if (dIdx !== -1)
+                                                    mcDragItem.itemsList.splice(dIdx, 1)
                                                 return
+                                            }
 
                                             modeChanSelector.selectItem(index, channelList.model, mouse.modifiers)
 

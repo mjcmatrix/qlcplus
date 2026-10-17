@@ -150,11 +150,14 @@ CustomPopupDialog
                                     case App.Clicked:
                                         if (qItem === item)
                                         {
-                                            model.isSelected = (mouseMods & Qt.ControlModifier) ? 2 : 1
+                                            if (mouseMods & Qt.ControlModifier)
+                                                model.isSelected = model.isSelected ? 0 : 2
+                                            else
+                                                model.isSelected = 1
                                             if (model.hasChildren)
                                                 model.isExpanded = item.isExpanded
                                         }
-                                        if (qItem.itemType === App.ChannelDragItem)
+                                        if (qItem.itemType === App.ChannelDragItem && qItem.isSelected)
                                         {
                                             popupRoot.universe = qItem.itemID >> 16
                                             popupRoot.channel = qItem.itemID & 0x0000FFFF

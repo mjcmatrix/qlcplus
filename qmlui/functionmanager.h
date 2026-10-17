@@ -234,6 +234,36 @@ public:
 protected:
     quint32 addFunctiontoDoc(Function *func, QString name, bool select);
     void addFunctionTreeItem(Function *func);
+
+    /** Add the tree item of $func, if the current filters let it through */
+    TreeModelItem *insertFunctionTreeItem(Function *func);
+
+    /** Move $item, the tree item of $func held by $model in the folder at
+     *  $folderPath, to where the current name and path of $func place it.
+     *  If $item is null, just add a tree item for $func */
+    void updateFunctionTreeItem(Function *func, TreeModelItem *item,
+                                TreeModel *model, const QString &folderPath);
+
+    /** Return the tree path of the folder holding $func */
+    QString functionTreePath(Function *func) const;
+
+    /** Return the tree holding the items of the folder at $treePath,
+     *  the root tree for an empty path, or null if there's no such folder */
+    TreeModel *folderModel(const QString &treePath) const;
+
+    /** Return the tree item of $func, wherever it is in the tree, as it may be
+     *  registered under an older name or path than the current ones of $func.
+     *  $model and $folderPath are set to the tree and the folder path holding it */
+    TreeModelItem *findFunctionItem(Function *func, TreeModel **model, QString *folderPath) const;
+
+    /** Remove the folder at $treePath and its parents from the empty folders */
+    void unmarkEmptyFolder(const QString &treePath);
+
+    /** Add the folder at $treePath to the empty folders, if nothing is left in it */
+    void markFolderIfEmpty(const QString &treePath);
+
+    /** Count the Functions of each type in the Doc and notify the counts */
+    void updateFunctionCounts();
     void emitFunctionCounts();
     void clearTree();
     void moveFunction(quint32 fID, QString newPath);
@@ -269,7 +299,13 @@ signals:
     void isEditingChanged(bool editing);
     void viewPositionChanged(int viewPosition);
 
+public:
+    /** Move the tree item of the Function with ID $fid to where its
+     *  current name and path place it, when they were changed elsewhere */
+    void refreshFunctionTreeItem(quint32 fid);
+
 public slots:
+    void slotDocClearing();
     void slotDocLoaded();
     void slotFunctionAdded(quint32 fid);
 
@@ -318,8 +354,9 @@ public:
     /** Return the number of currently selected folders */
     int selectedFolderCount() const;
 
-    /** Change the path of an existing folder and all its children */
-    Q_INVOKABLE void setFolderPath(QString oldAbsPath, QString newPath, bool isRelative);
+    /** Change the path of an existing folder and all its children.
+     *  Return false if a renamed folder would clash with a sibling folder */
+    Q_INVOKABLE bool setFolderPath(QString oldAbsPath, QString newPath, bool isRelative);
 
     /** Create an empty folder with path starting from the currently
      *  selected item */

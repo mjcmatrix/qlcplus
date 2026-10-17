@@ -546,7 +546,8 @@ Column
                         csDragItem.y = posInList.y
                         csDragItem.z = 10
 
-                        if (model.isSelected)
+                        // keep a selection for dragging, unless Ctrl deselects the step
+                        if (model.isSelected && !(mouse.modifiers & Qt.ControlModifier))
                             return
 
                         ceSelector.selectItem(index, cStepsList.model, mouse.modifiers)

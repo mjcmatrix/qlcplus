@@ -83,6 +83,7 @@ FunctionManager::FunctionManager(QQuickView *view, Doc *doc, QObject *parent)
     m_functionTree->setColumnNames(treeColumns);
     m_functionTree->enableSorting(true);
 
+    connect(m_doc, SIGNAL(clearing()), this, SLOT(slotDocClearing()));
     connect(m_doc, SIGNAL(loaded()), this, SLOT(slotDocLoaded()));
     connect(m_doc, SIGNAL(functionAdded(quint32)), this, SLOT(slotFunctionAdded(quint32)));
 }
@@ -223,20 +224,6 @@ quint32 FunctionManager::addFunctiontoDoc(Function *func, QString name, bool sel
 
     if (m_doc->addFunction(func) == true)
     {
-        if (!insertPath.isEmpty())
-        {
-            // The target folder and its ancestors are no longer empty
-            QString treePath = insertPath;
-            treePath.replace("/", TreeModel::separator());
-            QStringList tokens = treePath.split(TreeModel::separator(), Qt::SkipEmptyParts);
-            QString acc;
-            for (const QString &token : tokens)
-            {
-                acc = acc.isEmpty() ? token : acc + TreeModel::separator() + token;
-                m_emptyFolderList.removeAll(acc);
-            }
-        }
-
         QQmlEngine::setObjectOwnership(func, QQmlEngine::CppOwnership);
 
         if (select)
@@ -244,10 +231,11 @@ quint32 FunctionManager::addFunctiontoDoc(Function *func, QString name, bool sel
             // the new Function replaces the current selection, as the tree shows
             selectFunctionID(Function::invalidId(), false);
 
-            QString treePath = func->path(true).replace("/", TreeModel::separator());
-            QString itemPath = treePath.isEmpty() ? func->name()
-                                : QString("%1%2%3").arg(treePath).arg(TreeModel::separator()).arg(func->name());
-            m_functionTree->setItemRoleData(itemPath, 1, TreeModel::IsSelectedRole, TreeModel::LeafItem);
+            TreeModel *model = nullptr;
+            QString folderPath;
+            TreeModelItem *item = findFunctionItem(func, &model, &folderPath);
+            if (item != nullptr)
+                model->setItemRoleData(item, 1, TreeModel::IsSelectedRole);
             m_selectedIDList.append(QVariant(func->id()));
             emit selectedFunctionCountChanged(m_selectedIDList.count());
         }
@@ -280,8 +268,6 @@ quint32 FunctionManager::createFunction(int type, QVariantList fixturesList)
                 for (QVariant &fixtureID : fixturesList)
                     scene->addFixture(fixtureID.toUInt());
             }
-            m_sceneCount++;
-            emit sceneCountChanged();
         }
         break;
         case Function::ChaserType:
@@ -295,8 +281,6 @@ quint32 FunctionManager::createFunction(int type, QVariantList fixturesList)
                 Chaser *chaser = qobject_cast<Chaser*>(f);
                 chaser->setDuration(1000);
             }
-            m_chaserCount++;
-            emit chaserCountChanged();
         }
         break;
         case Function::SequenceType:
@@ -324,8 +308,6 @@ quint32 FunctionManager::createFunction(int type, QVariantList fixturesList)
                 name = tr("New Sequence");
                 Sequence *sequence = qobject_cast<Sequence *>(f);
                 sequence->setBoundSceneID(scene->id());
-                m_sequenceCount++;
-                emit sequenceCountChanged();
             }
             else
                 delete scene;
@@ -348,40 +330,30 @@ quint32 FunctionManager::createFunction(int type, QVariantList fixturesList)
                         efx->addFixture(fixture->id(), headIdx);
                 }
             }
-            m_efxCount++;
-            emit efxCountChanged();
         }
         break;
         case Function::CollectionType:
         {
             f = new Collection(m_doc);
             name = tr("New Collection");
-            m_collectionCount++;
-            emit collectionCountChanged();
         }
         break;
         case Function::RGBMatrixType:
         {
             f = new RGBMatrix(m_doc);
             name = tr("New RGB Matrix");
-            m_rgbMatrixCount++;
-            emit rgbMatrixCountChanged();
         }
         break;
         case Function::ScriptType:
         {
             f = new Script(m_doc);
             name = tr("New Script");
-            m_scriptCount++;
-            emit scriptCountChanged();
         }
         break;
         case Function::ShowType:
         {
             f = new Show(m_doc);
             name = tr("New Show");
-            m_showCount++;
-            emit showCountChanged();
         }
         break;
         default:
@@ -400,8 +372,6 @@ quint32 FunctionManager::createCollectionFromSelection()
     for (QVariant &fID : m_selectedIDList)
         collection->addFunction(fID.toUInt());
 
-    m_collectionCount++;
-    emit collectionCountChanged();
 
     return addFunctiontoDoc(collection, tr("New Collection"), true);
 }
@@ -420,8 +390,6 @@ quint32 FunctionManager::createChaserFromSelection()
         chaser->addStep(chs);
     }
 
-    m_chaserCount++;
-    emit chaserCountChanged();
 
     return addFunctiontoDoc(chaser, tr("New Chaser"), true);
 }
@@ -459,8 +427,6 @@ quint32 FunctionManager::createAudioVideoFunction(int type, QStringList fileList
             if (fileList.isEmpty())
             {
                 f = new Audio(m_doc);
-                m_audioCount++;
-                emit audioCountChanged();
             }
             else
             {
@@ -476,10 +442,8 @@ quint32 FunctionManager::createAudioVideoFunction(int type, QStringList fileList
                     {
                         Audio *audio = qobject_cast<Audio *>(f);
                         audio->setSourceFileName(filePath);
-                        m_audioCount++;
                     }
                 }
-                emit audioCountChanged();
                 return lastFuncID;
             }
         }
@@ -491,8 +455,6 @@ quint32 FunctionManager::createAudioVideoFunction(int type, QStringList fileList
             if (fileList.isEmpty())
             {
                 f = new Video(m_doc);
-                m_videoCount++;
-                emit videoCountChanged();
             }
             else
             {
@@ -508,10 +470,8 @@ quint32 FunctionManager::createAudioVideoFunction(int type, QStringList fileList
                     {
                         Video *video = qobject_cast<Video *>(f);
                         video->setSourceUrl(filePath);
-                        m_videoCount++;
                     }
                 }
-                emit videoCountChanged();
                 return lastFuncID;
             }
         }
@@ -612,6 +572,7 @@ void FunctionManager::clearTree()
     setPreviewEnabled(false);
     m_selectedIDList.clear();
     m_selectedFolderList.clear();
+    m_emptyFolderList.clear();
     m_functionTree->clear();
 }
 
@@ -697,6 +658,23 @@ void FunctionManager::selectFunctionID(quint32 fID, bool multiSelection)
 {
     if (fID == Function::invalidId())
         m_functionTree->setSingleSelection(nullptr);
+
+    // a multiple selection of a Function already selected deselects it
+    if (multiSelection && fID != Function::invalidId() && m_selectedIDList.contains(QVariant(fID)))
+    {
+        m_selectedIDList.removeAll(QVariant(fID));
+
+        Function *f = m_doc->function(fID);
+        if (m_previewEnabled == true && f != nullptr)
+        {
+            Tardis::instance()->enqueueAction(Tardis::FunctionStop, f->id(), true, false);
+            f->stop(FunctionParent::master());
+        }
+
+        emit selectedFunctionCountChanged(m_selectedIDList.count());
+        emit itemClicked(App::FunctionDragItem);
+        return;
+    }
 
     qDebug() << "Selected function:" << fID << multiSelection;
 
@@ -977,15 +955,23 @@ void FunctionManager::deleteFunction(quint32 fid)
                                       Tardis::instance()->actionToByteArray(Tardis::FunctionDelete, f->id()),
                                       QVariant());
 
-    QString fullPath = f->name();
-    QString funcPath = f->path(true);
-    if (funcPath.isEmpty() == false)
-    {
-        funcPath.replace("/", TreeModel::separator());
-        fullPath = QString("%1%2%3").arg(funcPath).arg(TreeModel::separator()).arg(f->name());
-    }
+    m_selectedIDList.removeAll(QVariant(fid));
+
+    // look for the tree item by the Function it refers to, since another
+    // Function in the same folder may have the same name
+    TreeModel *model = nullptr;
+    QString folderPath;
+    TreeModelItem *item = findFunctionItem(f, &model, &folderPath);
+
     m_doc->deleteFunction(f->id());
-    m_functionTree->removeItem(fullPath, TreeModel::LeafItem);
+
+    if (item != nullptr)
+    {
+        model->removeItem(item);
+        markFolderIfEmpty(folderPath);
+    }
+
+    updateFunctionCounts();
 }
 
 void FunctionManager::deleteFunctions(QVariantList IDList)
@@ -1017,26 +1003,15 @@ void FunctionManager::moveFunction(quint32 fID, QString newPath)
     QString newPathSlashed = newPath;
     newPathSlashed.replace(TreeModel::separator(), "/");
 
-    QString fPath = f->path(true);
-    if (fPath.isEmpty())
-    {
-        m_functionTree->removeItem(f->name(), TreeModel::LeafItem);
-    }
-    else
-    {
-        QString ftPath = fPath;
-        QString itemPath = QString("%1%2%3").arg(ftPath.replace("/", TreeModel::separator()))
-                                            .arg(TreeModel::separator()).arg(f->name());
-        m_functionTree->removeItem(itemPath, TreeModel::LeafItem);
-    }
+    // look for the tree item while the Function still has its old path
+    TreeModel *model = nullptr;
+    QString folderPath;
+    TreeModelItem *item = findFunctionItem(f, &model, &folderPath);
 
-    Tardis::instance()->enqueueAction(Tardis::FunctionSetPath, f->id(), fPath, newPathSlashed);
+    Tardis::instance()->enqueueAction(Tardis::FunctionSetPath, f->id(), f->path(true), newPathSlashed);
     f->setPath(newPathSlashed);
 
-    QVariantList params;
-    params.append(QVariant::fromValue(f)); // classRef
-    params.append(App::FunctionDragItem); // type
-    m_functionTree->addItem(f->name(), params, newPath);
+    updateFunctionTreeItem(f, item, model, folderPath);
 }
 
 void FunctionManager::moveFunctions(QString newPath)
@@ -1046,39 +1021,15 @@ void FunctionManager::moveFunctions(QString newPath)
 
     const bool movingFunctions = !m_selectedIDList.isEmpty();
     const bool movingFolders = !m_selectedFolderList.isEmpty();
-    bool wasEmptyNode = false;
 
     qDebug() << "Moving" << m_selectedIDList.count() << "functions to" << newPath;
-
-    if ((movingFunctions || movingFolders) && m_emptyFolderList.contains(newPath))
-    {
-        m_functionTree->removeItem(newPath, TreeModel::NodeItem);
-        m_emptyFolderList.removeAll(newPath);
-        wasEmptyNode = true;
-    }
 
     for (QVariant &fID : m_selectedIDList)
         moveFunction(fID.toUInt(), newPath);
 
-    if (wasEmptyNode)
-    {
-        QVariantList folderParams;
-        folderParams.append(QVariant()); // classRef
-        folderParams.append(App::FolderDragItem); // type
-        m_functionTree->setPathData(newPath, folderParams);
-    }
-
-    if ((movingFunctions || movingFolders) && !newPath.isEmpty())
-    {
-        // The drop target and its ancestors are no longer empty.
-        QStringList tokens = newPath.split(sep, Qt::SkipEmptyParts);
-        QString acc;
-        for (const QString &token : tokens)
-        {
-            acc = acc.isEmpty() ? token : acc + sep + token;
-            m_emptyFolderList.removeAll(acc);
-        }
-    }
+    // The drop target and its ancestors are no longer empty
+    if (movingFunctions || movingFolders)
+        unmarkEmptyFolder(newPath);
 
     if (movingFolders)
     {
@@ -1261,7 +1212,10 @@ bool FunctionManager::renameSelectedItems(QString newName, bool numbering, int s
 
     // rename folders first
     for (QString &path : m_selectedFolderList)
-        setFolderPath(path, newName, true);
+    {
+        if (setFolderPath(path, newName, true) == false)
+            return false;
+    }
 
     for (QVariant &id : m_selectedIDList) // C++11
     {
@@ -1343,7 +1297,12 @@ void FunctionManager::selectFolder(QString path, bool multiSelection)
     if (path.isEmpty())
         return;
 
-    m_selectedFolderList.append(path);
+    // a multiple selection of a folder already selected deselects it
+    if (multiSelection && m_selectedFolderList.contains(path))
+        m_selectedFolderList.removeAll(path);
+    else
+        m_selectedFolderList.append(path);
+
     emit selectedFolderCountChanged(m_selectedFolderList.count());
     emit itemClicked(App::FolderDragItem);
 }
@@ -1353,10 +1312,10 @@ int FunctionManager::selectedFolderCount() const
     return m_selectedFolderList.count();
 }
 
-void FunctionManager::setFolderPath(QString oldAbsPath, QString newPath, bool isRelative)
+bool FunctionManager::setFolderPath(QString oldAbsPath, QString newPath, bool isRelative)
 {
-    if (oldAbsPath.isEmpty())
-        return;
+    if (oldAbsPath.isEmpty() || newPath.isEmpty())
+        return false;
 
     QStringList tokens = oldAbsPath.split(TreeModel::separator());
     QString newAbsPath;
@@ -1366,6 +1325,13 @@ void FunctionManager::setFolderPath(QString oldAbsPath, QString newPath, bool is
         tokens.removeLast();
         tokens.append(newPath);
         newAbsPath = tokens.join(TreeModel::separator());
+
+        if (newAbsPath == oldAbsPath)
+            return true;
+
+        // renaming a folder as one of its siblings would show both
+        if (m_functionTree->itemAtPath(newAbsPath, TreeModel::NodeItem) != nullptr)
+            return false;
 
         // change the item label first
         m_functionTree->setItemRoleData(oldAbsPath, tokens.last(), TreeModel::LabelRole, TreeModel::NodeItem);
@@ -1392,6 +1358,11 @@ void FunctionManager::setFolderPath(QString oldAbsPath, QString newPath, bool is
     auto hasFuncPrefix = [&funcOldPrefix](const QString &path) {
         return path == funcOldPrefix || path.startsWith(funcOldPrefix + "/");
     };
+
+    // the folders moved are rebuilt at their new path: keep them expanded as they were
+    QStringList expandedPaths;
+    if (isRelative == false)
+        collectExpandedPaths(m_functionTree, QString(), expandedPaths);
 
     QStringList movedEmptyFolders;
     for (int i = 0; i < m_emptyFolderList.count(); ++i)
@@ -1432,6 +1403,17 @@ void FunctionManager::setFolderPath(QString oldAbsPath, QString newPath, bool is
     {
         m_functionTree->removeItem(oldAbsPath, TreeModel::NodeItem);
 
+        // moving the Functions out marked the old folders as empty, but they are gone now
+        for (int i = m_emptyFolderList.count() - 1; i >= 0; i--)
+        {
+            if (hasTreePrefix(m_emptyFolderList.at(i)))
+                m_emptyFolderList.removeAt(i);
+        }
+
+        QStringList parentTokens = oldAbsPath.split(TreeModel::separator());
+        parentTokens.removeLast();
+        markFolderIfEmpty(parentTokens.join(TreeModel::separator()));
+
         if (!movedEmptyFolders.isEmpty())
         {
             std::sort(movedEmptyFolders.begin(), movedEmptyFolders.end(),
@@ -1455,6 +1437,13 @@ void FunctionManager::setFolderPath(QString oldAbsPath, QString newPath, bool is
                                         TreeModel::EmptyNode | TreeModel::Expanded);
             }
         }
+
+        for (const QString &path : std::as_const(expandedPaths))
+        {
+            if (hasTreePrefix(path))
+                m_functionTree->setItemRoleData(newAbsPath + path.mid(oldAbsPath.length()), true,
+                                                TreeModel::IsExpandedRole, TreeModel::NodeItem);
+        }
     }
 
     for (int i = 0; i < m_selectedFolderList.count(); ++i)
@@ -1465,9 +1454,16 @@ void FunctionManager::setFolderPath(QString oldAbsPath, QString newPath, bool is
 
         const QString suffix = selectedPath.mid(oldAbsPath.length());
         m_selectedFolderList[i] = newAbsPath + suffix;
+
+        // a moved folder is a new tree item, which must show it is still selected
+        if (isRelative == false)
+            m_functionTree->setItemRoleData(m_selectedFolderList.at(i), 2,
+                                            TreeModel::IsSelectedRole, TreeModel::NodeItem);
     }
 
     //m_functionTree->printTree();
+
+    return true;
 }
 
 bool FunctionManager::createFolder(QString folderName)
@@ -1483,7 +1479,8 @@ bool FunctionManager::createFolder(QString folderName)
         compPath = QString("%1%2%3").arg(basePath).arg(TreeModel::separator()).arg(folderName);
 
     // check if a folder with the same name already exists
-    if (m_emptyFolderList.contains(compPath))
+    if (m_emptyFolderList.contains(compPath) ||
+        m_functionTree->itemAtPath(compPath, TreeModel::NodeItem) != nullptr)
         return false;
 
     // Function paths use '/' as separator, while folder paths in the tree
@@ -1514,40 +1511,39 @@ void FunctionManager::deleteSelectedFolders()
 {
     for (QString &path : m_selectedFolderList)
     {
-        if (m_emptyFolderList.contains(path))
-        {
-            m_emptyFolderList.removeAll(path);
-        }
-        else
-        {
-            // Function paths use '/' as separator, while folder paths in the tree
-            // use TreeModel::separator(). Convert before comparing.
-            QString slashedPath = QString(path).replace(TreeModel::separator(), '/');
+        // Function paths use '/' as separator, while folder paths in the tree
+        // use TreeModel::separator(). Convert before comparing.
+        QString slashedPath = QString(path).replace(TreeModel::separator(), '/');
 
-            for (Function *func : m_doc->functions())
-            {
-                if (func == nullptr)
-                    continue;
+        // A folder listed as empty may still hold Functions hidden by the
+        // filters, so look for them in any case
+        for (Function *func : m_doc->functions())
+        {
+            if (func == nullptr)
+                continue;
 
-                QString funcPath = func->path(true);
-                // Delete a function if it lives in this folder or in any of its subfolders,
-                // matching on a folder boundary to avoid catching sibling folders that
-                // share the same prefix (e.g. "Foo" must not match "Foobar").
-                if (funcPath == slashedPath || funcPath.startsWith(slashedPath + '/'))
-                    deleteFunction(func->id());
-            }
+            QString funcPath = func->path(true);
+            // Delete a function if it lives in this folder or in any of its subfolders,
+            // matching on a folder boundary to avoid catching sibling folders that
+            // share the same prefix (e.g. "Foo" must not match "Foobar").
+            if (funcPath == slashedPath || funcPath.startsWith(slashedPath + '/'))
+                deleteFunction(func->id());
         }
 
-        // Empty subfolders nested under the deleted one are not backed by any
-        // function, so remove them from the empty folder list as well.
+        // The folder and the empty subfolders nested under it are not backed
+        // by any function, so remove them from the empty folder list as well.
         for (int i = m_emptyFolderList.count() - 1; i >= 0; i--)
         {
             const QString &emptyPath = m_emptyFolderList.at(i);
-            if (emptyPath.startsWith(path + TreeModel::separator()))
+            if (emptyPath == path || emptyPath.startsWith(path + TreeModel::separator()))
                 m_emptyFolderList.removeAt(i);
         }
 
         m_functionTree->removeItem(path, TreeModel::NodeItem);
+
+        QStringList parentTokens = path.split(TreeModel::separator());
+        parentTokens.removeLast();
+        markFolderIfEmpty(parentTokens.join(TreeModel::separator()));
     }
 
     m_selectedFolderList.clear();
@@ -1900,8 +1896,6 @@ void FunctionManager::addFunctionTreeItem(Function *func)
     if (func == nullptr || func->isVisible() == false)
         return;
 
-    bool expandAll = m_searchFilter.length() >= SEARCH_MIN_CHARS;
-
     QQmlEngine::setObjectOwnership(func, QQmlEngine::CppOwnership);
 
     /* A tree item is registered under the name the Function has when it is
@@ -1910,33 +1904,192 @@ void FunctionManager::addFunctionTreeItem(Function *func)
     connect(func, SIGNAL(nameChanged(quint32)), this, SLOT(slotFunctionNameChanged(quint32)),
             static_cast<Qt::ConnectionType>(Qt::AutoConnection | Qt::UniqueConnection));
 
-    if ((m_filter == 0 || m_filter & func->type()) &&
-        (m_searchFilter.length() < SEARCH_MIN_CHARS || func->name().toLower().contains(m_searchFilter)))
+    // the folder of the Function and its parents are no longer empty
+    unmarkEmptyFolder(functionTreePath(func));
+
+    insertFunctionTreeItem(func);
+}
+
+TreeModelItem *FunctionManager::insertFunctionTreeItem(Function *func)
+{
+    if (func == nullptr || func->isVisible() == false)
+        return nullptr;
+
+    if ((m_filter != 0 && (m_filter & func->type()) == 0) ||
+        (m_searchFilter.length() >= SEARCH_MIN_CHARS && func->name().toLower().contains(m_searchFilter) == false))
+        return nullptr;
+
+    int flags = m_searchFilter.length() >= SEARCH_MIN_CHARS ? TreeModel::Expanded : 0;
+
+    // set the selection along with the item, so that the views show it
+    if (m_selectedIDList.contains(QVariant(func->id())))
+        flags |= TreeModel::Selected;
+
+    QVariantList params;
+    params.append(QVariant::fromValue(func)); // classRef
+    params.append(App::FunctionDragItem); // type
+
+    return m_functionTree->addItem(func->name(), params, functionTreePath(func), flags);
+}
+
+void FunctionManager::updateFunctionTreeItem(Function *func, TreeModelItem *item,
+                                             TreeModel *model, const QString &folderPath)
+{
+    QString fPath = functionTreePath(func);
+
+    if (item != nullptr)
     {
-        QVariantList params;
-        params.append(QVariant::fromValue(func)); // classRef
-        params.append(App::FunctionDragItem); // type
-        QString fPath = func->path(true).replace("/", TreeModel::separator());
-        TreeModelItem *item = m_functionTree->addItem(func->name(), params, fPath, expandAll ? TreeModel::Expanded : 0);
-        if (item != nullptr && m_selectedIDList.contains(QVariant(func->id())))
-            item->setFlag(TreeModel::Selected, true);
+        if (item->label() == func->name() && folderPath == fPath)
+            return;
+
+        model->removeItem(item);
+        markFolderIfEmpty(folderPath);
     }
 
-    switch (func->type())
+    unmarkEmptyFolder(fPath);
+    insertFunctionTreeItem(func);
+}
+
+QString FunctionManager::functionTreePath(Function *func) const
+{
+    return func->path(true).replace("/", TreeModel::separator());
+}
+
+TreeModel *FunctionManager::folderModel(const QString &treePath) const
+{
+    if (treePath.isEmpty())
+        return m_functionTree;
+
+    TreeModelItem *node = m_functionTree->itemAtPath(treePath, TreeModel::NodeItem);
+    if (node == nullptr || node->hasChildren() == false)
+        return nullptr;
+
+    return node->children();
+}
+
+static TreeModelItem *findItemByFunction(TreeModel *model, Function *func, const QString &basePath,
+                                         TreeModel **itemModel, QString *folderPath)
+{
+    if (model == nullptr)
+        return nullptr;
+
+    const QList<TreeModelItem *> items = model->items();
+
+    for (TreeModelItem *item : items)
     {
-        case Function::SceneType: m_sceneCount++; break;
-        case Function::ChaserType: m_chaserCount++; break;
-        case Function::SequenceType: m_sequenceCount++; break;
-        case Function::EFXType: m_efxCount++; break;
-        case Function::CollectionType: m_collectionCount++; break;
-        case Function::RGBMatrixType: m_rgbMatrixCount++; break;
-        case Function::ScriptType: m_scriptCount++; break;
-        case Function::ShowType: m_showCount++; break;
-        case Function::AudioType: m_audioCount++; break;
-        case Function::VideoType: m_videoCount++; break;
-        default:
-        break;
+        QVariantList data = item->data();
+        if (data.isEmpty() || data.at(0).value<Function *>() != func)
+            continue;
+
+        *itemModel = model;
+        *folderPath = basePath;
+        return item;
     }
+
+    for (TreeModelItem *item : items)
+    {
+        if (item->hasChildren() == false)
+            continue;
+
+        QString path = basePath.isEmpty() ? item->label()
+                                          : basePath + TreeModel::separator() + item->label();
+        TreeModelItem *found = findItemByFunction(item->children(), func, path, itemModel, folderPath);
+        if (found != nullptr)
+            return found;
+    }
+
+    return nullptr;
+}
+
+TreeModelItem *FunctionManager::findFunctionItem(Function *func, TreeModel **model, QString *folderPath) const
+{
+    if (func == nullptr)
+        return nullptr;
+
+    // the item is most likely in the folder of the Function, but it can be
+    // anywhere if the Function path was changed outside this manager
+    QString fPath = functionTreePath(func);
+    TreeModel *folder = folderModel(fPath);
+
+    if (folder != nullptr)
+    {
+        for (TreeModelItem *item : folder->items())
+        {
+            QVariantList data = item->data();
+            if (data.isEmpty() || data.at(0).value<Function *>() != func)
+                continue;
+
+            *model = folder;
+            *folderPath = fPath;
+            return item;
+        }
+    }
+
+    return findItemByFunction(m_functionTree, func, QString(), model, folderPath);
+}
+
+void FunctionManager::unmarkEmptyFolder(const QString &treePath)
+{
+    QStringList tokens = treePath.split(TreeModel::separator(), Qt::SkipEmptyParts);
+    QString acc;
+    for (const QString &token : tokens)
+    {
+        acc = acc.isEmpty() ? token : acc + TreeModel::separator() + token;
+        m_emptyFolderList.removeAll(acc);
+    }
+}
+
+void FunctionManager::markFolderIfEmpty(const QString &treePath)
+{
+    if (treePath.isEmpty() || m_emptyFolderList.contains(treePath))
+        return;
+
+    TreeModel *model = folderModel(treePath);
+    if (model == nullptr || model->rowCount() > 0)
+        return;
+
+    // the folder still holds Functions hidden by the filters
+    QString slashedPath = QString(treePath).replace(TreeModel::separator(), '/');
+    for (Function *f : m_doc->functions())
+    {
+        QString funcPath = f->path(true);
+        if (funcPath == slashedPath || funcPath.startsWith(slashedPath + '/'))
+            return;
+    }
+
+    // the folder is still shown, so keep track of it as any other empty folder
+    m_emptyFolderList.append(treePath);
+}
+
+void FunctionManager::updateFunctionCounts()
+{
+    m_sceneCount = m_chaserCount = m_sequenceCount = m_efxCount = 0;
+    m_collectionCount = m_rgbMatrixCount = m_scriptCount = 0;
+    m_showCount = m_audioCount = m_videoCount = 0;
+
+    for (Function *func : m_doc->functions())
+    {
+        if (func == nullptr || func->isVisible() == false)
+            continue;
+
+        switch (func->type())
+        {
+            case Function::SceneType: m_sceneCount++; break;
+            case Function::ChaserType: m_chaserCount++; break;
+            case Function::SequenceType: m_sequenceCount++; break;
+            case Function::EFXType: m_efxCount++; break;
+            case Function::CollectionType: m_collectionCount++; break;
+            case Function::RGBMatrixType: m_rgbMatrixCount++; break;
+            case Function::ScriptType: m_scriptCount++; break;
+            case Function::ShowType: m_showCount++; break;
+            case Function::AudioType: m_audioCount++; break;
+            case Function::VideoType: m_videoCount++; break;
+            default:
+            break;
+        }
+    }
+
+    emitFunctionCounts();
 }
 
 void FunctionManager::updateFunctionsTree()
@@ -1960,14 +2113,8 @@ void FunctionManager::updateFunctionsTree()
     QStringList pathsList;
     QList<Function *> sortedFunctions = m_doc->functions();
     std::sort(sortedFunctions.begin(), sortedFunctions.end(), functionLess);
-    QStringList sortedEmptyFolders = m_emptyFolderList;
-    std::sort(sortedEmptyFolders.begin(), sortedEmptyFolders.end(), caseInsensitiveLess);
 
     storeExpandedPaths();
-
-    m_sceneCount = m_chaserCount = m_sequenceCount = m_efxCount = 0;
-    m_collectionCount = m_rgbMatrixCount = m_scriptCount = 0;
-    m_showCount = m_audioCount = m_videoCount = 0;
 
     m_functionTree->clear();
 
@@ -1978,6 +2125,10 @@ void FunctionManager::updateFunctionsTree()
             pathsList.append(fPath);
         addFunctionTreeItem(func);
     }
+
+    // the Functions added may have filled some folders listed as empty
+    QStringList sortedEmptyFolders = m_emptyFolderList;
+    std::sort(sortedEmptyFolders.begin(), sortedEmptyFolders.end(), caseInsensitiveLess);
 
     QVariantList folderParams;
     folderParams.append(QVariant()); // classRef
@@ -2006,9 +2157,21 @@ void FunctionManager::updateFunctionsTree()
 
     restoreExpandedPaths();
 
+    // the selected folders are new tree items: show they are still selected,
+    // or drop them from the selection if the tree doesn't show them anymore
+    for (int i = m_selectedFolderList.count() - 1; i >= 0; i--)
+    {
+        const QString path = m_selectedFolderList.at(i);
+        if (m_functionTree->itemAtPath(path, TreeModel::NodeItem) == nullptr)
+            m_selectedFolderList.removeAt(i);
+        else
+            m_functionTree->setItemRoleData(path, 2, TreeModel::IsSelectedRole, TreeModel::NodeItem);
+    }
+    emit selectedFolderCountChanged(m_selectedFolderList.count());
+
     //m_functionTree->printTree(); // enable for debug purposes
 
-    emitFunctionCounts();
+    updateFunctionCounts();
 
     emit functionsListChanged();
 }
@@ -2027,6 +2190,14 @@ void FunctionManager::emitFunctionCounts()
     emit videoCountChanged();
 }
 
+void FunctionManager::slotDocClearing()
+{
+    clearTree();
+    updateFunctionCounts();
+    emit selectedFunctionCountChanged(0);
+    emit selectedFolderCountChanged(0);
+}
+
 void FunctionManager::slotDocLoaded()
 {
     setPreviewEnabled(false);
@@ -2040,53 +2211,27 @@ void FunctionManager::slotFunctionAdded(quint32 fid)
 
     Function *func = m_doc->function(fid);
     addFunctionTreeItem(func);
+    updateFunctionCounts();
 }
 
 void FunctionManager::slotFunctionNameChanged(quint32 fid)
+{
+    refreshFunctionTreeItem(fid);
+}
+
+void FunctionManager::refreshFunctionTreeItem(quint32 fid)
 {
     Function *func = m_doc->function(fid);
     if (func == nullptr)
         return;
 
-    QString fPath = func->path(true).replace("/", TreeModel::separator());
-    QList<TreeModelItem *> items;
-
-    if (fPath.isEmpty())
-    {
-        items = m_functionTree->items();
-    }
-    else
-    {
-        TreeModelItem *node = m_functionTree->itemAtPath(fPath, TreeModel::NodeItem);
-        if (node == nullptr || node->hasChildren() == false)
-            return;
-        items = node->children()->items();
-    }
-
-    // the item is found by the Function it refers to, since the name it is
-    // registered under is the one the Function had before the rename
-    for (TreeModelItem *item : items)
-    {
-        QVariantList data = item->data();
-        if (data.isEmpty() || data.at(0).value<Function *>() != func)
-            continue;
-
-        if (item->label() == func->name())
-            return;
-
-        QString oldPath = fPath.isEmpty() ? item->label()
-                                          : QString("%1%2%3").arg(fPath)
-                                            .arg(TreeModel::separator()).arg(item->label());
-        if (m_functionTree->removeItem(oldPath, TreeModel::LeafItem) == false)
-            return;
-
-        QVariantList params;
-        params.append(QVariant::fromValue(func)); // classRef
-        params.append(App::FunctionDragItem); // type
-        TreeModelItem *newItem = m_functionTree->addItem(func->name(), params, fPath);
-        if (newItem != nullptr && m_selectedIDList.contains(QVariant(func->id())))
-            newItem->setFlag(TreeModel::Selected, true);
-
+    // the item is found by the Function it refers to, since the name and
+    // the path it is registered under are the ones the Function had before
+    TreeModel *model = nullptr;
+    QString folderPath;
+    TreeModelItem *item = findFunctionItem(func, &model, &folderPath);
+    if (item == nullptr)
         return;
-    }
+
+    updateFunctionTreeItem(func, item, model, folderPath);
 }
