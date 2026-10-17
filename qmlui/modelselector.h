@@ -37,8 +37,16 @@ public:
 
     /** Add an entry to the selected items list.
      *  With no $keyModifiers, every previous item in the list will be
-     *  deselected. With Ctrl, an item already selected is deselected. */
+     *  deselected. With Ctrl, an item already selected is deselected.
+     *  With Shift, the items between the previously selected one (the anchor)
+     *  and $index replace the selection. Ctrl+Shift adds them instead. */
     Q_INVOKABLE void selectItem(int index, ListModel *model, int keyModifiers);
+
+    /** Same as Shift + selectItem for $index, for touch screens where there is no
+     *  Shift key: to be called on a press-and-hold. It works also right after
+     *  a press has selected $index with selectItem. With $additive the range
+     *  is added to the current selection, as with Ctrl+Shift */
+    Q_INVOKABLE void extendSelection(int index, ListModel *model, bool additive = false);
 
     /** Reset the currently active selection */
     Q_INVOKABLE void resetSelection(ListModel *model);
@@ -62,8 +70,11 @@ private:
     /** List of the currently selected item indices */
     QList <quint32> m_selectedIndices;
 
-    /** The rpviously selected item index */
+    /** The previously selected item index, which is the anchor of a range */
     int m_previousIndex;
+
+    /** The anchor before the last single selection of an item */
+    int m_priorIndex;
 
     /** The number of items currently selected (e.g. Functions, Fixtures, etc..) */
     int m_itemsCount;

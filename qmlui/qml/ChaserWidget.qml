@@ -538,6 +538,14 @@ Column
 
                     property bool dragActive: drag.active
 
+                    // a touch press-and-hold has no Shift key: it selects a range
+                    onPressAndHold: (mouse) =>
+                    {
+                        if (mouse.source === Qt.MouseEventNotSynthesized)
+                            return
+                        ceSelector.extendSelection(index, cStepsList.model, UISettings.multiSelectMode)
+                    }
+
                     onPressed: (mouse) =>
                     {
                         var posInList = delegateRoot.mapToItem(widgetRoot, mouse.x, mouse.y)
@@ -547,11 +555,12 @@ Column
                         csDragItem.z = 10
 
                         // keep a selection for dragging, unless Ctrl deselects the step
-                        if (model.isSelected && !(mouse.modifiers & Qt.ControlModifier))
+                        // or Shift selects a range
+                        if (model.isSelected && !(UISettings.selectionModifiers(mouse.modifiers) & (Qt.ControlModifier | Qt.ShiftModifier)))
                             return
 
-                        ceSelector.selectItem(index, cStepsList.model, mouse.modifiers)
-                        if (mouse.modifiers === 0)
+                        ceSelector.selectItem(index, cStepsList.model, UISettings.selectionModifiers(mouse.modifiers))
+                        if (UISettings.selectionModifiers(mouse.modifiers) === 0)
                         {
                             widgetRoot.indexChanged(index)
                             csDragItem.itemsList = []

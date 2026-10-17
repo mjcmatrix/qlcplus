@@ -919,8 +919,8 @@ Rectangle
                                                 // click on the mesh itself cannot drift apart.
                                                 // A plain click selects this item alone, Ctrl adds
                                                 // or removes it and Shift extends the selection
-                                                var select = (mouse.modifiers & Qt.ControlModifier) ? !isSelected : true
-                                                View3D.setItemSelectionByIndex(index, select, mouse.modifiers)
+                                                var select = (UISettings.selectionModifiers(mouse.modifiers) & Qt.ControlModifier) ? !isSelected : true
+                                                View3D.setItemSelectionByIndex(index, select, UISettings.selectionModifiers(mouse.modifiers))
                                             }
                                         }
                                     }

@@ -57,6 +57,7 @@ FunctionManager::FunctionManager(QQuickView *view, Doc *doc, QObject *parent)
     , m_viewPosition(0)
     , m_previewEnabled(false)
     , m_scenePreviewEnabled(false)
+    , m_rangeAnchorID(Function::invalidId())
     , m_filter(0)
     , m_searchFilter(QString())
 {
@@ -711,8 +712,132 @@ void FunctionManager::selectFunctionID(quint32 fID, bool multiSelection)
     if (fID != Function::invalidId())
         m_selectedIDList.append(QVariant(fID));
 
+    m_rangeAnchorID = fID;
+    m_rangeAnchorFolder.clear();
+
     emit selectedFunctionCountChanged(m_selectedIDList.count());
     emit itemClicked(App::FunctionDragItem);
+}
+
+struct VisibleTreeRow
+{
+    quint32 id;
+    QString folderPath;
+    TreeModel *model;
+    TreeModelItem *item;
+};
+
+/** Flatten the items a user sees in the tree, in display order */
+static void collectVisibleRows(TreeModel *model, const QString &basePath, QList<VisibleTreeRow> &rows)
+{
+    const QList<TreeModelItem *> items = model->items();
+    for (TreeModelItem *item : items)
+    {
+        QVariantList data = item->data();
+        Function *func = data.isEmpty() ? nullptr : data.at(0).value<Function *>();
+        if (func != nullptr)
+        {
+            rows.append({func->id(), QString(), model, item});
+            continue;
+        }
+
+        QString name = item->path().isEmpty() ? item->label() : item->path();
+        QString path = basePath.isEmpty() ? name : basePath + TreeModel::separator() + name;
+        rows.append({Function::invalidId(), path, model, item});
+
+        if (item->hasChildren() && (item->flags() & TreeModel::Expanded))
+            collectVisibleRows(item->children(), path, rows);
+    }
+}
+
+void FunctionManager::selectRange(quint32 fID, QString folderPath, bool additive)
+{
+    const bool toFunction = fID != Function::invalidId();
+    const bool hasAnchor = m_rangeAnchorID != Function::invalidId() || !m_rangeAnchorFolder.isEmpty();
+
+    if (!toFunction && folderPath.isEmpty())
+        return;
+
+    // nothing to extend from: behave as a plain click
+    if (!hasAnchor)
+    {
+        if (toFunction)
+            selectFunctionID(fID, additive);
+        else
+            selectFolder(folderPath, additive);
+        return;
+    }
+
+    QList<VisibleTreeRow> rows;
+    collectVisibleRows(m_functionTree, QString(), rows);
+
+    auto isRow = [](const VisibleTreeRow &r, quint32 id, const QString &path)
+    {
+        return id != Function::invalidId() ? r.id == id : (r.id == Function::invalidId() && r.folderPath == path);
+    };
+
+    int anchorIdx = -1, targetIdx = -1;
+    for (int i = 0; i < rows.count(); i++)
+    {
+        if (anchorIdx == -1 && isRow(rows.at(i), m_rangeAnchorID, m_rangeAnchorFolder))
+            anchorIdx = i;
+        if (targetIdx == -1 && isRow(rows.at(i), fID, folderPath))
+            targetIdx = i;
+    }
+
+    // the anchor is gone or hidden (e.g. its folder was collapsed)
+    if (anchorIdx == -1 || targetIdx == -1)
+    {
+        if (toFunction)
+            selectFunctionID(fID, additive);
+        else
+            selectFolder(folderPath, additive);
+        return;
+    }
+
+    if (!additive)
+    {
+        // same as a plain click: stop any previewed Function and start over
+        const quint32 anchorID = m_rangeAnchorID;
+        const QString anchorFolder = m_rangeAnchorFolder;
+        selectFunctionID(Function::invalidId(), false);
+        m_rangeAnchorID = anchorID;
+        m_rangeAnchorFolder = anchorFolder;
+    }
+
+    const int first = qMin(anchorIdx, targetIdx);
+    const int last = qMax(anchorIdx, targetIdx);
+
+    for (int i = first; i <= last; i++)
+    {
+        const VisibleTreeRow &row = rows.at(i);
+
+        if (row.id != Function::invalidId())
+        {
+            if (m_selectedIDList.contains(QVariant(row.id)))
+                continue;
+
+            m_selectedIDList.append(QVariant(row.id));
+            Function *f = m_doc->function(row.id);
+            if (m_previewEnabled && f != nullptr)
+            {
+                Tardis::instance()->enqueueAction(Tardis::FunctionStart, f->id(), false, true);
+                f->start(m_doc->masterTimer(), FunctionParent::master());
+            }
+        }
+        else
+        {
+            if (m_selectedFolderList.contains(row.folderPath))
+                continue;
+            m_selectedFolderList.append(row.folderPath);
+        }
+        // 2: select without deselecting the rest of the tree
+        row.model->setItemRoleData(row.item, 2, TreeModel::IsSelectedRole);
+    }
+
+    emit selectedFunctionCountChanged(m_selectedIDList.count());
+    emit selectedFolderCountChanged(m_selectedFolderList.count());
+    emit itemClicked(toFunction ? App::FunctionDragItem : App::FolderDragItem);
 }
 
 QString FunctionManager::getEditorResource(int funcID)
@@ -1299,9 +1424,15 @@ void FunctionManager::selectFolder(QString path, bool multiSelection)
 
     // a multiple selection of a folder already selected deselects it
     if (multiSelection && m_selectedFolderList.contains(path))
+    {
         m_selectedFolderList.removeAll(path);
+    }
     else
+    {
         m_selectedFolderList.append(path);
+        m_rangeAnchorID = Function::invalidId();
+        m_rangeAnchorFolder = path;
+    }
 
     emit selectedFolderCountChanged(m_selectedFolderList.count());
     emit itemClicked(App::FolderDragItem);

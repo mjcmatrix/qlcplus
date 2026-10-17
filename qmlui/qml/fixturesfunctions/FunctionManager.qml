@@ -326,6 +326,18 @@ Rectangle
                                     fDragItem.modifiers = mouseMods
                                 break;
                                 case App.Clicked:
+                                    // Shift+click selects the range from the last selected item
+                                    // (Ctrl+Shift+click adds it to the selection)
+                                    if (mouseMods & Qt.ShiftModifier)
+                                    {
+                                        if (qItem.itemType === App.FunctionDragItem)
+                                            functionManager.selectRange(iID, "", mouseMods & Qt.ControlModifier)
+                                        else
+                                            functionManager.selectRange(-1, qItem.nodePath, mouseMods & Qt.ControlModifier)
+                                        if (qItem === item && model.hasChildren)
+                                            model.isExpanded = item.isExpanded
+                                        break
+                                    }
                                     if (qItem === item)
                                     {
                                         // Ctrl+click toggles the selection of an item

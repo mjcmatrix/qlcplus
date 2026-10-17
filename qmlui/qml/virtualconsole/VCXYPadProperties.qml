@@ -294,6 +294,14 @@ Rectangle
                             }
                         }
 
+                        MultiSelectButton
+                        {
+                            anchors.top: parent.top
+                            anchors.right: addFixture.left
+                            width: height
+                            height: parent.height
+                        }
+
                         IconButton
                         {
                             id: addFixture
@@ -436,9 +444,23 @@ Rectangle
                                 MouseArea
                                 {
                                     anchors.fill: parent
+                                    // a touch press-and-hold has no Shift key: it selects a range
+                                    property bool longPressed: false
+                                    onPressedChanged: if (pressed) longPressed = false
+                                    onPressAndHold: (mouse) =>
+                                    {
+                                        if (mouse.source === Qt.MouseEventNotSynthesized)
+                                            return
+                                        longPressed = true
+                                        fxSelector.extendSelection(index, fixtureListView.model, UISettings.multiSelectMode)
+                                    }
+
                                     onClicked: (mouse) =>
                                     {
-                                        fxSelector.selectItem(index, fixtureListView.model, mouse.modifiers)
+                                        if (longPressed)
+                                            return
+
+                                        fxSelector.selectItem(index, fixtureListView.model, UISettings.selectionModifiers(mouse.modifiers))
                                     }
                                 }
 

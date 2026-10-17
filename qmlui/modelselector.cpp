@@ -23,6 +23,7 @@
 ModelSelector::ModelSelector(QObject *parent)
     : QObject(parent)
     , m_previousIndex(-1)
+    , m_priorIndex(-1)
     , m_itemsCount(0)
 {
 }
@@ -62,22 +63,28 @@ void ModelSelector::selectItem(int index, ListModel *model, int keyModifiers)
         return;
 
     //qDebug() << "select item with index:" << index;
+    const int anchorIndex = m_previousIndex;
+    const int priorIndex = m_priorIndex;
+
     if (keyModifiers == 0)
         resetSelection(model);
 
-    // handle multirow selection
-    if (keyModifiers & Qt::ShiftModifier)
+    // handle multirow selection: the range from the anchor replaces the
+    // selection, unless Ctrl is also pressed. The anchor doesn't move
+    if ((keyModifiers & Qt::ShiftModifier) && anchorIndex >= 0)
     {
-        if (index == m_previousIndex)
-            return;
+        if (!(keyModifiers & Qt::ControlModifier))
+            resetSelection(model);
 
-        int startIndex = index > m_previousIndex ? m_previousIndex + 1 : index;
-        int endIndex = index > m_previousIndex ? index : m_previousIndex - 1;
+        int startIndex = qMin(index, anchorIndex);
+        int endIndex = qMax(index, anchorIndex);
 
         for (int i = startIndex; i <= endIndex; i++)
             selectSingleItem(i, model);
+
+        m_previousIndex = anchorIndex;
     }
-    else if ((keyModifiers & Qt::ControlModifier) && m_selectedIndices.contains(quint32(index)))
+    else if ((keyModifiers & Qt::ControlModifier) && !(keyModifiers & Qt::ShiftModifier) && m_selectedIndices.contains(quint32(index)))
     {
         // Ctrl + click on a selected item deselects it
         deselectSingleItem(index, model);
@@ -88,7 +95,30 @@ void ModelSelector::selectItem(int index, ListModel *model, int keyModifiers)
         // Ctrl + select a single item
         selectSingleItem(index, model);
         m_previousIndex = index;
+        m_priorIndex = (anchorIndex != index) ? anchorIndex : priorIndex;
     }
+    emit itemsCountChanged(m_itemsCount);
+}
+
+void ModelSelector::extendSelection(int index, ListModel *model, bool additive)
+{
+    if (model == nullptr)
+        return;
+
+    // a press selected $index already and made it the anchor: the range
+    // starts from the item that was the anchor before that
+    int anchorIndex = (index == m_previousIndex) ? m_priorIndex : m_previousIndex;
+    if (anchorIndex < 0)
+        return;
+
+    if (!additive)
+        resetSelection(model);
+
+    for (int i = qMin(index, anchorIndex); i <= qMax(index, anchorIndex); i++)
+        selectSingleItem(i, model);
+
+    m_previousIndex = anchorIndex;
+    m_priorIndex = -1;
     emit itemsCountChanged(m_itemsCount);
 }
 
@@ -104,6 +134,7 @@ void ModelSelector::resetSelection(ListModel *model)
     m_selectedIndices.clear();
     m_itemsCount = 0;
     m_previousIndex = -1;
+    m_priorIndex = -1;
     emit itemsCountChanged(m_itemsCount);
 }
 

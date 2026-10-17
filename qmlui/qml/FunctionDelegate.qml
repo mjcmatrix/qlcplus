@@ -119,9 +119,28 @@ Rectangle
                     dragItem.y = mapped.y - UISettings.listItemHeight / 2
                 }
 
-                onPressed: (mouse) => funcDelegate.mouseEvent(App.Pressed, cRef ? cRef.id : -1, cRef ? cRef.type : -1, funcDelegate, mouse.modifiers)
-                onClicked: (mouse) => funcDelegate.mouseEvent(App.Clicked, cRef ? cRef.id : -1, cRef ? cRef.type : -1, funcDelegate, mouse.modifiers)
-                onDoubleClicked: (mouse) => funcDelegate.mouseEvent(App.DoubleClicked, cRef ? cRef.id : -1, cRef ? cRef.type : -1, funcDelegate, mouse.modifiers)
+                // a touch press-and-hold has no Shift key: it extends the selection
+                // to a range, and its release must not be handled as a plain click
+                property bool longPressed: false
+
+                onPressed: (mouse) =>
+                {
+                    longPressed = false
+                    funcDelegate.mouseEvent(App.Pressed, cRef ? cRef.id : -1, cRef ? cRef.type : -1, funcDelegate, UISettings.selectionModifiers(mouse.modifiers))
+                }
+                onPressAndHold: (mouse) =>
+                {
+                    if (mouse.source === Qt.MouseEventNotSynthesized || drag.active)
+                        return
+                    longPressed = true
+                    funcDelegate.mouseEvent(App.Clicked, cRef ? cRef.id : -1, cRef ? cRef.type : -1, funcDelegate, UISettings.selectionModifiers(Qt.ShiftModifier))
+                }
+                onClicked: (mouse) =>
+                {
+                    if (!longPressed)
+                        funcDelegate.mouseEvent(App.Clicked, cRef ? cRef.id : -1, cRef ? cRef.type : -1, funcDelegate, UISettings.selectionModifiers(mouse.modifiers))
+                }
+                onDoubleClicked: (mouse) => funcDelegate.mouseEvent(App.DoubleClicked, cRef ? cRef.id : -1, cRef ? cRef.type : -1, funcDelegate, UISettings.selectionModifiers(mouse.modifiers))
             }
 
             DropArea

@@ -177,7 +177,7 @@ Rectangle
                             drag.target: cfDelegate
                             drag.threshold: height / 2
 
-                            onPressed: (mouse) => ceSelector.selectItem(index, cFunctionList.model, mouse.modifiers)
+                            onPressed: (mouse) => ceSelector.selectItem(index, cFunctionList.model, UISettings.selectionModifiers(mouse.modifiers))
                             onDoubleClicked:
                             {
                                 var fId = cfDelegate.functionID

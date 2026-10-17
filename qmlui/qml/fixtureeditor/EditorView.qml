@@ -352,6 +352,8 @@ Rectangle
                                             }
                                         }
 
+                                        MultiSelectButton { }
+
                                         Rectangle
                                         {
                                             Layout.fillWidth: true
@@ -413,9 +415,23 @@ Rectangle
                                                 cDragItem.z = 10
                                             }
 
+                                            // a touch press-and-hold has no Shift key: it selects a range
+                                            property bool longPressed: false
+                                            onPressedChanged: if (pressed) longPressed = false
+                                            onPressAndHold: (mouse) =>
+                                            {
+                                                if (mouse.source === Qt.MouseEventNotSynthesized)
+                                                    return
+                                                longPressed = true
+                                                chanSelector.extendSelection(index, channelList.model, UISettings.multiSelectMode)
+                                            }
+
                                             onClicked: (mouse) =>
                                             {
-                                                chanSelector.selectItem(index, channelList.model, mouse.modifiers)
+                                                if (longPressed)
+                                                    return
+
+                                                chanSelector.selectItem(index, channelList.model, UISettings.selectionModifiers(mouse.modifiers))
                                             }
 
                                             onDoubleClicked:

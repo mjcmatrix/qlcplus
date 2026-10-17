@@ -551,6 +551,13 @@ SidePanel
                 color: "transparent"
             }
 
+            MultiSelectButton
+            {
+                width: iconSize
+                height: iconSize
+                visible: !inShowManager
+            }
+
             IconButton
             {
                 width: iconSize

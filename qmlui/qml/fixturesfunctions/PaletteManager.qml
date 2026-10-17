@@ -236,10 +236,19 @@ Rectangle
                         drag.target: pDragItem
                         drag.threshold: height / 2
 
+                        // a touch press-and-hold has no Shift key: it selects a range
+                        onPressAndHold: (mouse) =>
+                        {
+                            if (mouse.source === Qt.MouseEventNotSynthesized)
+                                return
+                            pmSelector.extendSelection(index, pListView.model, UISettings.multiSelectMode)
+                        }
+
                         onPressed: (mouse) =>
                         {
                             // keep a selection for dragging, unless Ctrl deselects the palette
-                            if (model.isSelected && !(mouse.modifiers & Qt.ControlModifier))
+                            // or Shift selects a range
+                            if (model.isSelected && !(UISettings.selectionModifiers(mouse.modifiers) & (Qt.ControlModifier | Qt.ShiftModifier)))
                                 return
 
                             var posnInWindow = pDelegate.mapToItem(mainView, pDelegate.x, pDelegate.y)
@@ -248,7 +257,7 @@ Rectangle
                             pDragItem.y = posnInWindow.y - (pDragItem.height / 4)
                             pDragItem.z = 10
 
-                            pmSelector.selectItem(index, pListView.model, mouse.modifiers)
+                            pmSelector.selectItem(index, pListView.model, UISettings.selectionModifiers(mouse.modifiers))
 
                             var selIndices = pmSelector.itemsList()
                             var arr = []

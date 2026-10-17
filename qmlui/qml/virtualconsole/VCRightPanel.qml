@@ -98,6 +98,14 @@ SidePanel
                     loops: Animation.Infinite
                 }
             }
+            MultiSelectButton
+            {
+                z: 2
+                width: iconSize
+                height: iconSize
+                visible: virtualConsole.editMode
+            }
+
             IconButton
             {
                 id: funcEditor

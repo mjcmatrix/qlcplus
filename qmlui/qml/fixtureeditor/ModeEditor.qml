@@ -203,6 +203,8 @@ Rectangle
                                         }
                                     }
 
+                                    MultiSelectButton { }
+
                                     Rectangle
                                     {
                                         Layout.fillWidth: true
@@ -289,6 +291,14 @@ Rectangle
                                         drag.target: mcDragItem
                                         drag.threshold: height / 2
 
+                                        // a touch press-and-hold has no Shift key: it selects a range
+                                        onPressAndHold: (mouse) =>
+                                        {
+                                            if (mouse.source === Qt.MouseEventNotSynthesized)
+                                                return
+                                            modeChanSelector.extendSelection(index, channelList.model, UISettings.multiSelectMode)
+                                        }
+
                                         onPressed: (mouse) =>
                                         {
                                             var posnInWindow = mcDelegate.mapToItem(channelList, mcDelegate.x, mcDelegate.y)
@@ -300,19 +310,19 @@ Rectangle
                                             if (model.isSelected)
                                             {
                                                 // keep a selection for dragging, unless Ctrl deselects the channel
-                                                if ((mouse.modifiers & Qt.ControlModifier) == 0)
+                                                if ((UISettings.selectionModifiers(mouse.modifiers) & Qt.ControlModifier) == 0)
                                                     return
 
-                                                modeChanSelector.selectItem(index, channelList.model, mouse.modifiers)
+                                                modeChanSelector.selectItem(index, channelList.model, UISettings.selectionModifiers(mouse.modifiers))
                                                 var dIdx = mcDragItem.itemsList.indexOf(mcDelegate)
                                                 if (dIdx !== -1)
                                                     mcDragItem.itemsList.splice(dIdx, 1)
                                                 return
                                             }
 
-                                            modeChanSelector.selectItem(index, channelList.model, mouse.modifiers)
+                                            modeChanSelector.selectItem(index, channelList.model, UISettings.selectionModifiers(mouse.modifiers))
 
-                                            if ((mouse.modifiers & Qt.ControlModifier) == 0)
+                                            if ((UISettings.selectionModifiers(mouse.modifiers) & Qt.ControlModifier) == 0)
                                                 mcDragItem.itemsList = []
 
                                             mcDragItem.itemsList.push(mcDelegate)
@@ -555,6 +565,8 @@ Rectangle
                                     }
                                 }
 
+                                MultiSelectButton { }
+
                                 Rectangle
                                 {
                                     Layout.fillWidth: true
@@ -602,9 +614,23 @@ Rectangle
                                     MouseArea
                                     {
                                         anchors.fill: parent
+                                        // a touch press-and-hold has no Shift key: it selects a range
+                                        property bool longPressed: false
+                                        onPressedChanged: if (pressed) longPressed = false
+                                        onPressAndHold: (mouse) =>
+                                        {
+                                            if (mouse.source === Qt.MouseEventNotSynthesized)
+                                                return
+                                            longPressed = true
+                                            modeHeadSelector.extendSelection(index, headList.model, UISettings.multiSelectMode)
+                                        }
+
                                         onClicked: (mouse) =>
                                         {
-                                            modeHeadSelector.selectItem(index, headList.model, mouse.modifiers)
+                                            if (longPressed)
+                                                return
+
+                                            modeHeadSelector.selectItem(index, headList.model, UISettings.selectionModifiers(mouse.modifiers))
                                         }
                                     }
 

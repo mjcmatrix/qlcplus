@@ -291,15 +291,29 @@ Rectangle
                             {
                                 anchors.fill: parent
 
+                                // a touch press-and-hold has no Shift key: it selects a range
+                                property bool longPressed: false
+                                onPressedChanged: if (pressed) longPressed = false
+                                onPressAndHold: (mouse) =>
+                                {
+                                    if (mouse.source === Qt.MouseEventNotSynthesized)
+                                        return
+                                    longPressed = true
+                                    seSelector.extendSelection(index, sfxList.model, UISettings.multiSelectMode)
+                                }
+
                                 onClicked: (mouse) =>
                                 {
                                     if (compDelegate.itemType === App.FixtureDragItem)
                                     {
-                                        if (!mouse.modifiers)
+                                        if (!UISettings.selectionModifiers(mouse.modifiers))
                                             contextManager.resetFixtureSelection()
                                     }
 
-                                    seSelector.selectItem(index, sfxList.model, mouse.modifiers)
+                                    if (longPressed)
+                                        return
+
+                                    seSelector.selectItem(index, sfxList.model, UISettings.selectionModifiers(mouse.modifiers))
                                 }
                             }
                         }

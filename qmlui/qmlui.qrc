@@ -36,6 +36,7 @@
     <file alias="GenericMultiDragItem.qml">qml/GenericMultiDragItem.qml</file>
     <file alias="FontAwesomeVariables.qml">qml/FontAwesomeVariables.qml</file>
     <file alias="IconButton.qml">qml/IconButton.qml</file>
+    <file alias="MultiSelectButton.qml">qml/MultiSelectButton.qml</file>
     <file alias="IconPopupButton.qml">qml/IconPopupButton.qml</file>
     <file alias="IconTextEntry.qml">qml/IconTextEntry.qml</file>
     <file alias="InputChannelDelegate.qml">qml/InputChannelDelegate.qml</file>

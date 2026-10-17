@@ -82,6 +82,17 @@ QtObject
        and starve it of position updates, regardless of "keys" filtering. */
     property bool internalDragActive: false
 
+    /** Touch screens have no Ctrl key: when this is true every list treats a
+     *  tap as a Ctrl+tap, so items are added to or removed from the selection.
+     *  The multiple selection toggle buttons of the UI control it */
+    property bool multiSelectMode: false
+
+    /** Return the mouse $modifiers, with Ctrl added in multiple selection mode */
+    function selectionModifiers(modifiers)
+    {
+        return multiSelectMode ? (modifiers | Qt.ControlModifier) : modifiers
+    }
+
     /* Channel properties column widths */
     property real chPropsModesWidth: bigItemHeight * 1.2
     property real chPropsFlagsWidth: bigItemHeight * 1.3
