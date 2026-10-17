@@ -296,6 +296,41 @@ Item
         return fallbackStep > 0 ? Math.round(xPos / fallbackStep) * fallbackStep : xPos
     }
 
+    /* Snap the edge being resized, at $xPos, while the handle is dragged:
+       to the nearest item edge within snapThreshold, otherwise to the grid.
+       Sets itemSnapped and the snap guide when an item edge is hit */
+    function snapResizeEdge(xPos, modifiers)
+    {
+        showManager.snapGuideX = -1
+        itemSnapped = false
+
+        if (snappingActive(modifiers))
+        {
+            var bestDist = snapThreshold + 1
+            var bestSnapX = -1
+            for (var i = 0; i < snapEdges.length; i++)
+            {
+                var dist = Math.abs(snapEdges[i] - xPos)
+                if (dist < bestDist)
+                {
+                    bestDist = dist
+                    bestSnapX = snapEdges[i]
+                }
+            }
+            if (bestSnapX >= 0 && bestDist <= snapThreshold)
+            {
+                showManager.snapGuideX = bestSnapX
+                itemSnapped = true
+                return bestSnapX
+            }
+        }
+
+        if (showManager.gridEnabled && !snapSuspended(modifiers))
+            return gridSnap(xPos, tickSize)
+
+        return xPos
+    }
+
     Connections
     {
         target: showManager
@@ -1072,32 +1107,7 @@ Item
 
                 var globalX = mapToItem(itemRoot.parent, mouse.x, mouse.y).x
                 var dx = globalX - pressX
-                var newX = origItemX + dx
-
-                // snap-to-item: check left edge
-                showManager.snapGuideX = -1
-                itemSnapped = false
-
-                if (snappingActive(mouse.modifiers))
-                {
-                    var bestDist = snapThreshold + 1
-                    var bestSnapX = -1
-                    for (var i = 0; i < snapEdges.length; i++)
-                    {
-                        var dist = Math.abs(snapEdges[i] - newX)
-                        if (dist < bestDist)
-                        {
-                            bestDist = dist
-                            bestSnapX = snapEdges[i]
-                        }
-                    }
-                    if (bestSnapX >= 0 && bestDist <= snapThreshold)
-                    {
-                        newX = bestSnapX
-                        showManager.snapGuideX = bestSnapX
-                        itemSnapped = true
-                    }
-                }
+                var newX = snapResizeEdge(origItemX + dx, mouse.modifiers)
 
                 // clamp: don't allow shrinking past minimum width
                 var maxX = origItemX + origItemW - horLeftHandler.width
@@ -1131,16 +1141,6 @@ Item
                     {
                         itemRoot.width += itemRoot.x
                         itemRoot.x = 0
-                    }
-
-                    // check grid snapping (skip if item-snapped, or if resizing a
-                    // pair: the boundary must stay exactly shared between both)
-                    if (!pairItem && !itemSnapped && itemRoot.x && showManager.gridEnabled
-                            && !snapSuspended(mouse.modifiers))
-                    {
-                        var currX = itemRoot.x
-                        itemRoot.x = gridSnap(itemRoot.x, tickSize)
-                        itemRoot.width += (currX - itemRoot.x)
                     }
 
                     var newDuration, newStartTime
@@ -1308,32 +1308,11 @@ Item
                 {
                     var obj = mapToItem(itemRoot, mouseX, mouseY)
                     var newWidth = obj.x + (horRightHdlMa.width - mouse.x)
+                    newWidth = snapResizeEdge(itemRoot.x + newWidth, mouse.modifiers) - itemRoot.x
 
-                    // snap-to-item: check right edge
-                    showManager.snapGuideX = -1
-                    itemSnapped = false
-
-                    if (snappingActive(mouse.modifiers))
-                    {
-                        var rightEdge = itemRoot.x + newWidth
-                        var bestDist = snapThreshold + 1
-                        var bestSnapX = -1
-                        for (var i = 0; i < snapEdges.length; i++)
-                        {
-                            var dist = Math.abs(snapEdges[i] - rightEdge)
-                            if (dist < bestDist)
-                            {
-                                bestDist = dist
-                                bestSnapX = snapEdges[i]
-                            }
-                        }
-                        if (bestSnapX >= 0 && bestDist <= snapThreshold)
-                        {
-                            newWidth = bestSnapX - itemRoot.x
-                            showManager.snapGuideX = bestSnapX
-                            itemSnapped = true
-                        }
-                    }
+                    // clamp: snapping must not shrink the item past its minimum width
+                    if (newWidth < horLeftHandler.width)
+                        newWidth = horLeftHandler.width
 
                     // clamp: don't allow shrinking the paired item past its own minimum width
                     if (pairItem)
@@ -1364,15 +1343,6 @@ Item
 
                 if (sfRef)
                 {
-                    // check grid snapping (skip if item-snapped, or if resizing a
-                    // pair: the boundary must stay exactly shared between both)
-                    if (!pairItem && !itemSnapped && showManager.gridEnabled
-                            && !snapSuspended(mouse.modifiers))
-                    {
-                        var snappedEndPos = gridSnap(itemRoot.x + itemRoot.width, tickSize)
-                        itemRoot.width = snappedEndPos - itemRoot.x
-                    }
-
                     var newDuration
                     var itemIsBeats = isBeatsItem()
 
