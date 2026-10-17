@@ -694,7 +694,7 @@ Rectangle
                     color: UISettings.fgMain
                     font.family: UISettings.fontAwesomeFontName
                     font.pixelSize: parent.height * 0.70
-                    text: FontAwesome.fa_scissors
+                    text: FontAwesome.fa_code_fork
                 }
 
                 ToolTip
@@ -1087,7 +1087,7 @@ Rectangle
                 width: tempoLaneButtons.buttonSize
                 height: width
                 anchors.verticalCenter: parent.verticalCenter
-                faSource: FontAwesome.fa_scissors
+                faSource: FontAwesome.fa_code_fork
                 faColor: UISettings.fgMain
                 tooltip: qsTr("Split the selected tempo section at the cursor")
                 enabled: parent.parent.sectionSelected && tempoLane.cursorInSelection
