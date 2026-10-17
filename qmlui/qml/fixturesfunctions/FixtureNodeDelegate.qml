@@ -442,7 +442,10 @@ Column
                                 case App.Clicked:
                                     if (qItem === item)
                                     {
-                                        model.isSelected = (mouseMods & Qt.ControlModifier) ? 2 : 1
+                                        if (mouseMods & Qt.ControlModifier)
+                                            model.isSelected = model.isSelected ? 0 : 2
+                                        else
+                                            model.isSelected = 1
                                         if (model.hasChildren)
                                             model.isExpanded = item.isExpanded
                                     }

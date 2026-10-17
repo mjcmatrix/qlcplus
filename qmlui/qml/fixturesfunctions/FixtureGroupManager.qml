@@ -561,32 +561,39 @@ Rectangle
                                 case App.Clicked:
                                     if (qItem === item)
                                     {
-                                        model.isSelected = (mouseMods & Qt.ControlModifier) ? 2 : 1
+                                        if (mouseMods & Qt.ControlModifier)
+                                            model.isSelected = model.isSelected ? 0 : 2
+                                        else
+                                            model.isSelected = 1
                                         if (model.hasChildren)
                                             model.isExpanded = item.isExpanded
                                     }
 
+                                    // the tree node has already been (de)selected, so follow it.
+                                    // Read it before the reset below, which clears the tree selection
+                                    var select = qItem.isSelected
+
                                     if (!(mouseMods & Qt.ControlModifier))
                                         contextManager.resetFixtureSelection()
 
-                                    console.log("Item clicked. Type: " + qItem.itemType + ", id: " + iID)
+                                    console.log("Item clicked. Type: " + qItem.itemType + ", id: " + iID + ", selected: " + select)
 
                                     var itemID = iID
 
                                     switch (qItem.itemType)
                                     {
                                         case App.FixtureDragItem:
-                                            contextManager.setFixtureSelection(iID, -1, true)
+                                            contextManager.setFixtureSelection(iID, -1, select)
                                         break
                                         case App.HeadDragItem:
                                             itemID = qItem.itemID
-                                            contextManager.setFixtureSelection(qItem.itemID, iID, true)
+                                            contextManager.setFixtureSelection(qItem.itemID, iID, select)
                                         break
                                         case App.UniverseDragItem:
-                                            contextManager.setFixtureGroupSelection(iID, true, true)
+                                            contextManager.setFixtureGroupSelection(iID, select, true)
                                         break
                                         case App.FixtureGroupDragItem:
-                                            contextManager.setFixtureGroupSelection(iID, true, false)
+                                            contextManager.setFixtureGroupSelection(iID, select, false)
                                         break
                                     }
 

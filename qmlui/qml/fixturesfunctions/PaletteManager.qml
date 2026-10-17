@@ -238,7 +238,8 @@ Rectangle
 
                         onPressed: (mouse) =>
                         {
-                            if (model.isSelected)
+                            // keep a selection for dragging, unless Ctrl deselects the palette
+                            if (model.isSelected && !(mouse.modifiers & Qt.ControlModifier))
                                 return
 
                             var posnInWindow = pDelegate.mapToItem(mainView, pDelegate.x, pDelegate.y)

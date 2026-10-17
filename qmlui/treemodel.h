@@ -103,6 +103,9 @@ public:
     /** Remove an item with the given $path and $type from the tree */
     bool removeItem(const QString& path, int type = AnyItem);
 
+    /** Remove $item from the first level items of this tree. This is not recursive */
+    bool removeItem(TreeModelItem *item);
+
     /**
      * Set the value of an item role by item path. This is recursive.
      *

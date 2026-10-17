@@ -33,7 +33,7 @@ ModelSelector::~ModelSelector()
 
 void ModelSelector::selectSingleItem(int index, ListModel *model)
 {
-    if (model == nullptr)
+    if (model == nullptr || m_selectedIndices.contains(quint32(index)))
         return;
 
     QModelIndex idx = model->index(index, 0, QModelIndex());
@@ -42,6 +42,18 @@ void ModelSelector::selectSingleItem(int index, ListModel *model)
     m_itemsCount++;
 
     emit itemSelectionChanged(index, true);
+}
+
+void ModelSelector::deselectSingleItem(int index, ListModel *model)
+{
+    if (model == nullptr || m_selectedIndices.removeAll(quint32(index)) == 0)
+        return;
+
+    QModelIndex idx = model->index(index, 0, QModelIndex());
+    model->setDataWithRole(idx, "isSelected", false);
+    m_itemsCount--;
+
+    emit itemSelectionChanged(index, false);
 }
 
 void ModelSelector::selectItem(int index, ListModel *model, int keyModifiers)
@@ -64,6 +76,12 @@ void ModelSelector::selectItem(int index, ListModel *model, int keyModifiers)
 
         for (int i = startIndex; i <= endIndex; i++)
             selectSingleItem(i, model);
+    }
+    else if ((keyModifiers & Qt::ControlModifier) && m_selectedIndices.contains(quint32(index)))
+    {
+        // Ctrl + click on a selected item deselects it
+        deselectSingleItem(index, model);
+        m_previousIndex = m_selectedIndices.isEmpty() ? -1 : int(m_selectedIndices.last());
     }
     else
     {

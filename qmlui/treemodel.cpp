@@ -49,17 +49,13 @@ void TreeModel::clear()
         return;
 
     beginRemoveRows(QModelIndex(), 0, itemsCount - 1);
-    for (int i = 0; i < itemsCount; i++)
-    {
-        TreeModelItem *item = m_items.takeLast();
-        if (item->hasChildren())
-            item->children()->clear();
-
-        delete item;
-    }
-    endRemoveRows();
+    QList<TreeModelItem *> oldItems = m_items;
     m_items.clear();
     m_itemsPathMap.clear();
+    endRemoveRows();
+
+    // delete the items only once the views have dropped their rows
+    qDeleteAll(oldItems);
 }
 
 void TreeModel::setColumnNames(QStringList names)
@@ -124,6 +120,13 @@ TreeModelItem *TreeModel::addItem(QString label, QVariantList data, QString path
         item->setFlags(flags);
         if (flags & EmptyNode)
         {
+            // a folder with this name is already here: don't show it twice
+            int index = itemIndex(label, NodeItem);
+            if (index != -1)
+            {
+                delete item;
+                return m_items.at(index);
+            }
             item->setPath(label);
             m_itemsPathMap[label] = item;
         }
@@ -143,7 +146,8 @@ TreeModelItem *TreeModel::addItem(QString label, QVariantList data, QString path
         {
             item = new TreeModelItem(pathList.at(0));
             item->setPath(pathList.at(0));
-            item->setFlags(flags);
+            // the selection is meant for the leaf, not for the folders above it
+            item->setFlags(flags & ~Selected);
             QQmlEngine::setObjectOwnership(item, QQmlEngine::CppOwnership);
             if (item->setChildrenColumns(m_roles) == true)
             {
@@ -251,15 +255,7 @@ bool TreeModel::removeItem(const QString& path, int type)
         if (index == -1)
             return false;
 
-        TreeModelItem *item = m_items.at(index);
-
-        beginRemoveRows(QModelIndex(), index, index);
-        // a leaf sharing its label with a node must not unmap the node
-        if (m_itemsPathMap.value(path, nullptr) == item)
-            m_itemsPathMap.remove(path);
-        m_items.removeAt(index);
-        delete item;
-        endRemoveRows();
+        return removeItem(m_items.at(index));
     }
     else
     {
@@ -270,6 +266,27 @@ bool TreeModel::removeItem(const QString& path, int type)
         QString subPath = path.mid(path.indexOf(TreeModel::separator()) + 1);
         return item->children()->removeItem(subPath, type);
     }
+
+    return true;
+}
+
+bool TreeModel::removeItem(TreeModelItem *item)
+{
+    int index = m_items.indexOf(item);
+    if (index == -1)
+        return false;
+
+    beginRemoveRows(QModelIndex(), index, index);
+    // a leaf sharing its label with a node must not unmap the node
+    QString key = item->path().isEmpty() ? item->label() : item->path();
+    if (m_itemsPathMap.value(key, nullptr) == item)
+        m_itemsPathMap.remove(key);
+    m_items.removeAt(index);
+    endRemoveRows();
+
+    // delete the item (and its children tree) only once the views
+    // have dropped the row that refers to it
+    delete item;
 
     return true;
 }

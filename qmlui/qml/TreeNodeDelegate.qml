@@ -108,7 +108,12 @@ Column
                 text: cRef ? cRef.name : textLabel
                 originalText: text
 
-                onTextConfirmed: (text) => nodeContainer.pathChanged(nodePath, text)
+                onTextConfirmed: (text) =>
+                {
+                    nodeContainer.pathChanged(nodePath, text)
+                    // show the label of the model, which is unchanged if the rename was refused
+                    nodeLabel.text = Qt.binding(function() { return cRef ? cRef.name : textLabel })
+                }
             }
         } // Row
 
@@ -230,7 +235,10 @@ Column
                                 case App.Clicked:
                                     if (qItem === item)
                                     {
-                                        model.isSelected = (mouseMods & Qt.ControlModifier) ? 2 : 1
+                                        if (mouseMods & Qt.ControlModifier)
+                                            model.isSelected = model.isSelected ? 0 : 2
+                                        else
+                                            model.isSelected = 1
                                         if (model.hasChildren)
                                             model.isExpanded = item.isExpanded
                                     }

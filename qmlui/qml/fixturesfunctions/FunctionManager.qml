@@ -328,7 +328,11 @@ Rectangle
                                 case App.Clicked:
                                     if (qItem === item)
                                     {
-                                        model.isSelected = (mouseMods & Qt.ControlModifier) ? 2 : 1
+                                        // Ctrl+click toggles the selection of an item
+                                        if (mouseMods & Qt.ControlModifier)
+                                            model.isSelected = model.isSelected ? 0 : 2
+                                        else
+                                            model.isSelected = 1
                                         if (model.hasChildren)
                                             model.isExpanded = item.isExpanded
                                     }
@@ -354,7 +358,12 @@ Rectangle
                                     }
 
                                     if (mouseMods === -1)
-                                        functionManager.selectFunctionID(iID, false)
+                                    {
+                                        if (qItem.itemType === App.FunctionDragItem)
+                                            functionManager.selectFunctionID(iID, false)
+                                        else
+                                            functionManager.selectFolder(qItem.nodePath, false)
+                                    }
 
                                     fDragItem.itemsList = functionManager.selectedFunctionsID()
                                     fDragItem.itemLabel = qItem.textLabel

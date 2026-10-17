@@ -824,6 +824,8 @@ int Tardis::processAction(TardisAction &action, bool undo)
         {
             auto member = std::mem_fn(&Function::setPath);
             member(qobject_cast<Function *>(m_doc->function(action.m_objID)), value->toString());
+            // Functions don't notify a path change, so move the tree item here
+            m_functionManager->refreshFunctionTreeItem(action.m_objID);
         }
         break;
         case FunctionSetTempoType:
