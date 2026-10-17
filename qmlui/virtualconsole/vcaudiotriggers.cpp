@@ -170,6 +170,18 @@ bool VCAudioTriggers::captureEnabled() const
     return m_captureEnabled;
 }
 
+void VCAudioTriggers::notifyFunctionStarting(VCWidget *widget, quint32 fid, qreal fIntensity, bool excludeMonitored)
+{
+    Q_UNUSED(fid)
+    Q_UNUSED(fIntensity)
+    Q_UNUSED(excludeMonitored)
+
+    // stop capturing when any other widget (e.g. in the same Solo Frame)
+    // starts a Function
+    if (widget != this && m_captureEnabled)
+        setCaptureEnabled(false);
+}
+
 void VCAudioTriggers::setCaptureEnabled(bool enable)
 {
     if (enable == m_captureEnabled)
@@ -592,6 +604,10 @@ void VCAudioTriggers::slotSpectrumDataChanged(double *spectrumBands,
     if (size != m_spectrumBars.count() - 1)
         return;
 
+    // a disabled widget must not start/stop functions or widgets
+    if (isDisabled())
+        return;
+
     m_audioLevels.clear();
     m_audioLevels.reserve(size + 1);
 
@@ -856,9 +872,23 @@ void VCAudioTriggers::slotInputValueChanged(quint8 id, uchar value)
  * DMXSource
  *********************************************************************/
 
+void VCAudioTriggers::setDisabled(bool disable)
+{
+    for (QSharedPointer<GenericFader> fader : m_fadersMap)
+    {
+        if (fader.isNull() == false)
+            fader->setEnabled(!disable && m_captureEnabled);
+    }
+
+    VCWidget::setDisabled(disable);
+}
+
 void VCAudioTriggers::writeDMX(MasterTimer *timer, QList<Universe *> universes)
 {
     Q_UNUSED(timer);
+
+    if (isDisabled())
+        return;
 
     quint32 lastUniverse = Universe::invalid();
     QSharedPointer<GenericFader> fader;
@@ -881,7 +911,7 @@ void VCAudioTriggers::writeDMX(MasterTimer *timer, QList<Universe *> universes)
                         fader->adjustIntensity(intensity());
                         m_fadersMap[universe] = fader;
                     }
-                    fader->setEnabled(m_captureEnabled);
+                    fader->setEnabled(m_captureEnabled && !isDisabled());
                     lastUniverse = universe;
                 }
 
