@@ -380,9 +380,10 @@ SidePanel
                 z: 2
                 width: iconSize
                 height: iconSize
-                faSource: FontAwesome.fa_layer_group
-                faColor: UISettings.fgMain
+                faSource: FontAwesome.fa_folder_plus
+                faColor: "limegreen"
                 tooltip: qsTr("Add the selected items to a new container")
+                enabled: selectedItemsCount && !functionManager.isEditing
                 checkable: true
                 counter: selectedItemsCount && !functionManager.isEditing
 
