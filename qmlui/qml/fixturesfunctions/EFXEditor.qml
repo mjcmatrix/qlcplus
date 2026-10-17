@@ -450,9 +450,23 @@ Rectangle
                                             MouseArea
                                             {
                                                 anchors.fill: parent
+                                                // a touch press-and-hold has no Shift key: it selects a range
+                                                property bool longPressed: false
+                                                onPressedChanged: if (pressed) longPressed = false
+                                                onPressAndHold: (mouse) =>
+                                                {
+                                                    if (mouse.source === Qt.MouseEventNotSynthesized)
+                                                        return
+                                                    longPressed = true
+                                                    eeSelector.extendSelection(index, fixtureListView.model, UISettings.multiSelectMode)
+                                                }
+
                                                 onClicked: (mouse) =>
                                                 {
-                                                    eeSelector.selectItem(index, fixtureListView.model, mouse.modifiers)
+                                                    if (longPressed)
+                                                        return
+
+                                                    eeSelector.selectItem(index, fixtureListView.model, UISettings.selectionModifiers(mouse.modifiers))
                                                 }
                                             }
 

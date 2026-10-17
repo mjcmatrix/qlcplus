@@ -364,16 +364,16 @@ Column
 
             onPressed: (mouse) =>
             {
-                nodeContainer.mouseEvent(App.Pressed, cRef ? cRef.id : -1, -1, nodeContainer, mouse.modifiers)
+                nodeContainer.mouseEvent(App.Pressed, cRef ? cRef.id : -1, -1, nodeContainer, UISettings.selectionModifiers(mouse.modifiers))
             }
             onClicked: (mouse) =>
             {
                 nodeLabel.forceActiveFocus()
-                nodeContainer.mouseEvent(App.Clicked, itemID, -1, nodeContainer, mouse.modifiers)
+                nodeContainer.mouseEvent(App.Clicked, itemID, -1, nodeContainer, UISettings.selectionModifiers(mouse.modifiers))
             }
             onDoubleClicked: (mouse) =>
             {
-                nodeContainer.mouseEvent(App.DoubleClicked, itemID, -1, nodeContainer, mouse.modifiers)
+                nodeContainer.mouseEvent(App.DoubleClicked, itemID, -1, nodeContainer, UISettings.selectionModifiers(mouse.modifiers))
             }
         }
     }

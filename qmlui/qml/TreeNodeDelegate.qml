@@ -134,16 +134,34 @@ Column
 
             drag.target: dragItem
 
-            onPressed: (mouse) => nodeContainer.mouseEvent(App.Pressed, cRef ? cRef.id : -1, nodeContainer.itemType,
-                                                nodeContainer, mouse.modifiers)
+            // a touch press-and-hold has no Shift key: it extends the selection
+            // to a range, and its release must not be handled as a plain click
+            property bool longPressed: false
+
+            onPressed: (mouse) =>
+            {
+                longPressed = false
+                nodeContainer.mouseEvent(App.Pressed, cRef ? cRef.id : -1, nodeContainer.itemType,
+                                         nodeContainer, UISettings.selectionModifiers(mouse.modifiers))
+            }
+            onPressAndHold: (mouse) =>
+            {
+                if (mouse.source === Qt.MouseEventNotSynthesized || drag.active)
+                    return
+                longPressed = true
+                nodeContainer.mouseEvent(App.Clicked, cRef ? cRef.id : -1, nodeContainer.itemType,
+                                         nodeContainer, UISettings.selectionModifiers(Qt.ShiftModifier))
+            }
             onClicked: (mouse) =>
             {
+                if (longPressed)
+                    return
                 nodeLabel.forceActiveFocus()
                 nodeContainer.mouseEvent(App.Clicked, cRef ? cRef.id : -1, nodeContainer.itemType,
-                                         nodeContainer, mouse.modifiers)
+                                         nodeContainer, UISettings.selectionModifiers(mouse.modifiers))
             }
             onDoubleClicked: (mouse) => nodeContainer.mouseEvent(App.DoubleClicked, cRef ? cRef.id : -1,
-                                                                 nodeContainer.itemType, nodeContainer, mouse.modifiers)
+                                                                 nodeContainer.itemType, nodeContainer, UISettings.selectionModifiers(mouse.modifiers))
         }
 
         DropArea
@@ -235,10 +253,14 @@ Column
                                 case App.Clicked:
                                     if (qItem === item)
                                     {
-                                        if (mouseMods & Qt.ControlModifier)
-                                            model.isSelected = model.isSelected ? 0 : 2
-                                        else
-                                            model.isSelected = 1
+                                        // a Shift range selection is up to the owner of the list
+                                        if (!(mouseMods & Qt.ShiftModifier))
+                                        {
+                                            if (mouseMods & Qt.ControlModifier)
+                                                model.isSelected = model.isSelected ? 0 : 2
+                                            else
+                                                model.isSelected = 1
+                                        }
                                         if (model.hasChildren)
                                             model.isExpanded = item.isExpanded
                                     }

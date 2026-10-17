@@ -217,15 +217,20 @@ Rectangle
                 onClicked: if (sceneEditor) sceneEditor.pasteToAllFixtureSameType()
             }
 
-            IconButton
+            MultiSelectButton
             {
-                visible: isOpen && editorLoader.item && editorLoader.item.hasOwnProperty("isSceneEditor")
+                visible: isOpen && editorLoader.item ? true : false
                 width: UISettings.iconSizeDefault
                 height: UISettings.iconSizeDefault
-                imgSource: "qrc:/multiple.svg"
-                tooltip: qsTr("Toggle multiple channel selection")
-                checkable: true
-                onToggled: editorLoader.item.multipleSelection = checked
+            }
+
+            // the Scene Editor channels follow the multiple selection mode too
+            Binding
+            {
+                target: editorLoader.item
+                property: "multipleSelection"
+                value: UISettings.multiSelectMode
+                when: editorLoader.item && editorLoader.item.hasOwnProperty("isSceneEditor")
             }
 
             IconButton

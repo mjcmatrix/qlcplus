@@ -56,9 +56,21 @@ CustomPopupDialog
             {
                 label: qsTr("Fixtures")
             }
-            RobotoText
+            RowLayout
             {
-                label: qsTr("Functions")
+                Layout.fillWidth: true
+
+                RobotoText
+                {
+                    Layout.fillWidth: true
+                    label: qsTr("Functions")
+                }
+
+                MultiSelectButton
+                {
+                    width: UISettings.iconSizeMedium
+                    height: UISettings.iconSizeMedium
+                }
             }
 
             // row 2

@@ -35,6 +35,15 @@ Rectangle
 
     property string currentContext: ""
 
+    // the Universe and 3D views follow the touch multiple selection mode of the lists
+    Binding
+    {
+        target: contextManager
+        property: "multipleSelection"
+        value: UISettings.multiSelectMode
+        when: contextManager !== null
+    }
+
     Component.onCompleted: UISettings.sidePanelWidth = Math.min(width / 3, UISettings.bigItemHeight * 5)
     onWidthChanged: UISettings.sidePanelWidth = Math.min(width / 3, UISettings.bigItemHeight * 5)
 

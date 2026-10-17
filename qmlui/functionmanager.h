@@ -157,6 +157,12 @@ public:
      *  considering $multiSelection as an append/replace action */
     Q_INVOKABLE void selectFunctionID(quint32 fID, bool multiSelection);
 
+    /** Select all the visible tree items between the last selected item (the
+     *  range anchor) and the Function $fID, or the folder at $folderPath when
+     *  $fID is invalid. The range replaces the current selection, unless
+     *  $additive is true. The anchor does not move, as in file managers */
+    Q_INVOKABLE void selectRange(quint32 fID, QString folderPath, bool additive);
+
     /** Get the QML resource for a Function editor that can edit $funcID */
     Q_INVOKABLE QString getEditorResource(int funcID);
 
@@ -333,6 +339,10 @@ private:
     /** List of the Function IDs currently selected
      *  and previewed, if preview is enabled */
     QVariantList m_selectedIDList;
+
+    /** The Function ID or the folder path a range selection starts from */
+    quint32 m_rangeAnchorID;
+    QString m_rangeAnchorFolder;
 
     quint32 m_filter;
     QString m_searchFilter;

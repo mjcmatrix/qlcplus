@@ -163,7 +163,7 @@ Rectangle
                 {
                     isSelected = !isSelected
                     virtualConsole.enableFlicking(false)
-                    virtualConsole.setWidgetSelection(wObj.id, wRoot, isSelected, mouse.modifiers & Qt.ControlModifier)
+                    virtualConsole.setWidgetSelection(wObj.id, wRoot, isSelected, UISettings.selectionModifiers(mouse.modifiers) & Qt.ControlModifier)
                 }
 
                 drag.target = wRoot
@@ -191,7 +191,7 @@ Rectangle
                     if (isSelected == false)
                     {
                         isSelected = true
-                        virtualConsole.setWidgetSelection(wObj.id, wRoot, isSelected, mouse.modifiers & Qt.ControlModifier)
+                        virtualConsole.setWidgetSelection(wObj.id, wRoot, isSelected, UISettings.selectionModifiers(mouse.modifiers) & Qt.ControlModifier)
                     }
                 }
             }

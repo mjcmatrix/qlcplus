@@ -390,15 +390,10 @@ SidePanel
                 onToggled: contextManager.positionPicking = checked
             }
 
-            IconButton
+            MultiSelectButton
             {
                 width: iconSize
                 height: iconSize
-                imgSource: "qrc:/multiple.svg"
-                tooltip: qsTr("Toggle multiple item selection")
-                checkable: true
-                checked: contextManager ? contextManager.multipleSelection : false
-                onToggled: contextManager.multipleSelection = checked
             }
 
             IconButton
