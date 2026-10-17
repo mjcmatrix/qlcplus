@@ -241,12 +241,23 @@ public:
     int currentTime() const;
     void setCurrentTime(int currentTime);
 
+    /** Remember the timeline scroll offset (in pixels) of the current Show */
+    Q_INVOKABLE void setViewOffset(qreal offset);
+
+    /** Get the timeline scroll offset (in pixels) last left on the current
+     *  Show, or -1 if it has none */
+    Q_INVOKABLE qreal savedViewOffset() const;
+
 signals:
     void timeDivisionChanged(Show::TimeDivision division);
     void beatsDivisionChanged(int beatsDivision);
     void timeScaleChanged(float timeScale);
     void tickSizeChanged(float tickSize);
     void currentTimeChanged(int currentTime);
+
+    /** Emitted once a Show has been opened with its zoom level and cursor
+     *  position applied, so that the view can restore its scroll offset */
+    void viewStateRestored();
 
 private:
     /** The current time scale of the Show Manager timeline */
@@ -255,6 +266,14 @@ private:
     /** The time scale last used on each Show, by Show ID, so that
      *  every Show reopens at its own zoom level */
     QMap<quint32, float> m_showTimeScales;
+
+    /** The cursor position in ms last left on each Show, by Show ID */
+    QMap<quint32, int> m_showCursorTimes;
+
+    /** The timeline scroll offset last left on each Show, by Show ID, in
+     *  time division ticks so that it does not depend on the zoom level
+     *  or the screen density */
+    QMap<quint32, float> m_showViewOffsets;
 
     /** Size in pixels of the Show Manager time division */
     float m_tickSize;
