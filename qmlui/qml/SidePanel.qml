@@ -37,13 +37,42 @@ Rectangle
 
     property alias itemID: viewLoader.itemID
 
+    // width temporarily added by the loaded content (e.g. a second drawer)
+    property int extraWidth: 0
+
     signal contentLoaded(var item, int ID)
+
+    function addExtraWidth(w)
+    {
+        if (extraWidth)
+            return
+        extraWidth = w
+        width += w
+    }
+
+    function removeExtraWidth()
+    {
+        width -= extraWidth
+        extraWidth = 0
+    }
+
+    // content gets replaced or unloaded: whatever width it added goes away
+    onLoaderSourceChanged:
+    {
+        if (extraWidth && isOpen)
+            removeExtraWidth()
+        else
+            extraWidth = 0
+    }
 
     function animatePanel(checked)
     {
         console.log("checked=" + checked + ", isOpen=" + isOpen)
         if (checked === isOpen)
             return
+
+        animateOpen.stop()
+        animateClose.stop()
 
         if (isOpen == false)
         {

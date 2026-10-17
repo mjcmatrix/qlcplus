@@ -106,7 +106,7 @@ Rectangle
                     {
                         funcMgrLoader.source = ""
                         funcMgrLoader.visible = false
-                        rightSidePanel.width -= funcMgrLoader.width
+                        rightSidePanel.removeExtraWidth()
                     }
 
                     var prevID = collectionEditor.previousID
@@ -126,14 +126,13 @@ Rectangle
                     {
                         if (checked)
                         {
-                            if (!funcMgrLoader.visible)
-                                rightSidePanel.width += UISettings.sidePanelWidth
+                            rightSidePanel.addExtraWidth(UISettings.sidePanelWidth)
                             funcMgrLoader.visible = true
                             funcMgrLoader.source = "qrc:/FunctionManager.qml"
                         }
                         else
                         {
-                            rightSidePanel.width -= funcMgrLoader.width
+                            rightSidePanel.removeExtraWidth()
                             funcMgrLoader.source = ""
                             funcMgrLoader.visible = false
                         }
