@@ -230,7 +230,8 @@ SidePanel
         visible: false
         title: qsTr("Error")
         message: ""
-        onAccepted: {}
+        // go back to the name entry dialog, keeping the entered text
+        onAccepted: textInputPopup.open()
     }
 
 
