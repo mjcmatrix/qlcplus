@@ -148,7 +148,59 @@ void ShowRunner_Test::tempoMapClockSurvivesRestart()
 
     chaser->stop(parent);
     timer->timerTickFunctions(universes);
+    QVERIFY(chaser->isRunning() == false);
+    QVERIFY(chaser->tempoMapClock().isNull());
     m_doc->inputOutputMap()->releaseUniverses(false);
+}
+
+void ShowRunner_Test::tempoMapClockConsecutiveItems()
+{
+    Scene *scene = new Scene(m_doc);
+    m_doc->addFunction(scene);
+    Chaser *chaser = new Chaser(m_doc);
+    chaser->setTempoType(Function::Beats);
+    chaser->addStep(ChaserStep(scene->id()));
+    m_doc->addFunction(chaser);
+
+    Show *show = new Show(m_doc);
+    m_doc->addFunction(show);
+    Track *track = new Track(Function::invalidId(), show);
+    show->addTrack(track);
+    TempoMap map;
+    map.addSection(TempoSection(0, 60000, 127.5, 4, "Song"));
+    show->setTempoMap(map);
+
+    ShowFunction *sf1 = track->createShowFunction(chaser->id());
+    sf1->setStartTime(1000);
+    sf1->setDuration(2000);
+    ShowFunction *sf2 = track->createShowFunction(chaser->id());
+    sf2->setStartTime(3000);
+    sf2->setDuration(2000);
+
+    MasterTimer *timer = m_doc->masterTimer();
+    show->start(timer, FunctionParent::master());
+    int firstOk = 0, secondOk = 0, secondTicks = 0;
+    for (quint32 ms = 0; ms < 5000; ms += MasterTimer::tick())
+    {
+        timer->timerTick();
+        QSharedPointer<const TempoMapClock> clock = chaser->tempoMapClock();
+        if (ms >= 1100 && ms < 2900 && chaser->isRunning() && clock && clock->origin == 1000)
+            firstOk++;
+        if (ms >= 3100 && ms < 4900)
+        {
+            secondTicks++;
+            if (chaser->isRunning() && clock && clock->origin == 3000)
+                secondOk++;
+        }
+    }
+    QCOMPARE(firstOk, int(1800 / MasterTimer::tick()));
+    QCOMPARE(secondOk, secondTicks);
+
+    for (int i = 0; i < 10; i++)
+        timer->timerTick();
+    QVERIFY(show->isRunning() == false);
+    QVERIFY(chaser->isRunning() == false);
+    QVERIFY(chaser->tempoMapClock().isNull());
 }
 
 void ShowRunner_Test::tempoMapRunner()

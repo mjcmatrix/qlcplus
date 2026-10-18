@@ -40,6 +40,7 @@ private slots:
     void intensity();
     void stopRunner();
     void tempoMapClockSurvivesRestart();
+    void tempoMapClockConsecutiveItems();
     void tempoMapRunner();
     void tempoMapCollection();
     void sameFunctionConsecutiveItems();
