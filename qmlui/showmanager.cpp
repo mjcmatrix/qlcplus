@@ -47,6 +47,9 @@
 #define KXMLQLCShowManagerTimeScale   QStringLiteral("TimeScale")
 #define KXMLQLCShowManagerShowZoom    QStringLiteral("ShowZoom")
 #define KXMLQLCShowManagerShowID      QStringLiteral("ID")
+#define KXMLQLCShowManagerShowView    QStringLiteral("ShowView")
+#define KXMLQLCShowManagerCursorTime  QStringLiteral("CursorTime")
+#define KXMLQLCShowManagerViewOffset  QStringLiteral("ViewOffset")
 
 /* Timeline zoom limits. Every item position and size is computed by
    dividing by the time scale, so it must never reach zero or go
@@ -165,6 +168,10 @@ void ShowManager::setCurrentShowID(int currentShowID)
         if (m_currentShow->id() == (quint32)currentShowID)
             return;
         m_tempoDetector->stop();
+        /* The cursor is shared by all the Shows: keep where it was left,
+           unless the Show is playing and the cursor just follows it */
+        if (m_currentShow->isRunning() == false)
+            m_showCursorTimes[m_currentShow->id()] = m_currentTime;
         disconnect(m_currentShow, SIGNAL(timeChanged(quint32)), this, SLOT(slotTimeChanged(quint32)));
         disconnect(m_currentShow, SIGNAL(showFinished()), this, SLOT(slotShowFinished()));
         disconnect(m_currentShow, SIGNAL(stopped(quint32)), this, SLOT(slotShowStopped()));
@@ -172,6 +179,14 @@ void ShowManager::setCurrentShowID(int currentShowID)
 
     m_currentShow = qobject_cast<Show*>(m_doc->function(currentShowID));
     m_cursorMovedDuringPause = false;
+    /* A playing Show keeps the cursor on its playback position */
+    if (m_currentShow == nullptr)
+        m_currentTime = 0;
+    else if (m_currentShow->isRunning())
+        m_currentTime = int(m_currentShow->elapsed());
+    else
+        m_currentTime = m_showCursorTimes.value(m_currentShow->id(), 0);
+    emit currentTimeChanged(m_currentTime);
     clearTimeRange();
     emit currentShowIDChanged(currentShowID);
     emit isEditingChanged();
@@ -206,6 +221,8 @@ void ShowManager::setCurrentShowID(int currentShowID)
     emit tracksChanged();
     setPlaybackState(m_currentShow != nullptr ? m_currentShow->isRunning() : false,
                      m_currentShow != nullptr ? m_currentShow->isPaused() : false);
+
+    emit viewStateRestored();
 }
 
 QString ShowManager::showName() const
@@ -571,6 +588,24 @@ void ShowManager::setCurrentTime(int currentTime)
 
     m_currentTime = currentTime;
     emit currentTimeChanged(currentTime);
+}
+
+void ShowManager::setViewOffset(qreal offset)
+{
+    /* While a Show plays the view follows the cursor: keep the offset the
+       user left it at */
+    if (m_currentShow == nullptr || m_currentShow->isRunning() || m_tickSize <= 0)
+        return;
+
+    m_showViewOffsets[m_currentShow->id()] = float(offset / m_tickSize);
+}
+
+qreal ShowManager::savedViewOffset() const
+{
+    if (m_currentShow == nullptr || m_showViewOffsets.contains(m_currentShow->id()) == false)
+        return -1;
+
+    return qreal(m_showViewOffsets.value(m_currentShow->id())) * m_tickSize;
 }
 
 /*********************************************************************
@@ -2715,6 +2750,8 @@ void ShowManager::resetContents()
     resetView();
     m_currentTime = 0;
     emit currentTimeChanged(m_currentTime);
+    m_showCursorTimes.clear();
+    m_showViewOffsets.clear();
 
     m_selectedTrackId = -1;
     emit selectedTrackIdChanged(m_selectedTrackId);
@@ -3219,6 +3256,8 @@ void ShowManager::slotFunctionRemoved(quint32 id)
         resetContents();
 
     m_showTimeScales.remove(id);
+    m_showCursorTimes.remove(id);
+    m_showViewOffsets.remove(id);
 }
 
 /*********************************************************************
@@ -4779,7 +4818,8 @@ bool ShowManager::saveXML(QXmlStreamWriter *doc) const
     Q_ASSERT(doc != nullptr);
 
     /* Nothing to remember if no Show is being edited or was ever zoomed */
-    if (m_currentShow == nullptr && m_showTimeScales.isEmpty())
+    if (m_currentShow == nullptr && m_showTimeScales.isEmpty()
+        && m_showCursorTimes.isEmpty() && m_showViewOffsets.isEmpty())
         return true;
 
     doc->writeStartElement(KXMLQLCShowManager);
@@ -4795,6 +4835,33 @@ bool ShowManager::saveXML(QXmlStreamWriter *doc) const
         doc->writeStartElement(KXMLQLCShowManagerShowZoom);
         doc->writeAttribute(KXMLQLCShowManagerShowID, QString::number(it.key()));
         doc->writeAttribute(KXMLQLCShowManagerTimeScale, QString::number(it.value()));
+        doc->writeEndElement();
+    }
+
+    /* The cursor of the current Show is only kept in m_currentTime */
+    QMap<quint32, int> cursorTimes = m_showCursorTimes;
+    if (m_currentShow != nullptr && m_currentShow->isRunning() == false)
+        cursorTimes[m_currentShow->id()] = m_currentTime;
+
+    QList<quint32> viewIDs = cursorTimes.keys();
+    for (quint32 id : m_showViewOffsets.keys())
+    {
+        if (viewIDs.contains(id) == false)
+            viewIDs.append(id);
+    }
+
+    for (quint32 id : viewIDs)
+    {
+        int cursorTime = cursorTimes.value(id, 0);
+        bool hasOffset = m_showViewOffsets.contains(id);
+        if (cursorTime <= 0 && hasOffset == false)
+            continue;
+
+        doc->writeStartElement(KXMLQLCShowManagerShowView);
+        doc->writeAttribute(KXMLQLCShowManagerShowID, QString::number(id));
+        doc->writeAttribute(KXMLQLCShowManagerCursorTime, QString::number(qMax(0, cursorTime)));
+        if (hasOffset)
+            doc->writeAttribute(KXMLQLCShowManagerViewOffset, QString::number(m_showViewOffsets.value(id)));
         doc->writeEndElement();
     }
 
@@ -4817,6 +4884,8 @@ bool ShowManager::loadXML(QXmlStreamReader &root)
     /* The zoom level of each Show. Read them before opening the current
        Show, so that it opens at its own one */
     m_showTimeScales.clear();
+    m_showCursorTimes.clear();
+    m_showViewOffsets.clear();
     while (root.readNextStartElement())
     {
         if (root.name() == KXMLQLCShowManagerShowZoom)
@@ -4828,6 +4897,21 @@ bool ShowManager::loadXML(QXmlStreamReader &root)
             /* Ignore a reference to a missing Function or to one that is not a Show */
             if (idOk && ok && timeScale > 0 && qobject_cast<Show *>(m_doc->function(id)) != nullptr)
                 m_showTimeScales[id] = qBound(SHOWMGR_MIN_TIME_SCALE, timeScale, SHOWMGR_MAX_TIME_SCALE);
+        }
+        else if (root.name() == KXMLQLCShowManagerShowView)
+        {
+            QXmlStreamAttributes viewAttrs = root.attributes();
+            bool idOk = false, cursorOk = false, offsetOk = false;
+            quint32 id = viewAttrs.value(KXMLQLCShowManagerShowID).toUInt(&idOk);
+            int cursorTime = viewAttrs.value(KXMLQLCShowManagerCursorTime).toInt(&cursorOk);
+            float offset = viewAttrs.value(KXMLQLCShowManagerViewOffset).toFloat(&offsetOk);
+            if (idOk && qobject_cast<Show *>(m_doc->function(id)) != nullptr)
+            {
+                if (cursorOk && cursorTime > 0)
+                    m_showCursorTimes[id] = cursorTime;
+                if (offsetOk && offset >= 0)
+                    m_showViewOffsets[id] = offset;
+            }
         }
         else
         {
