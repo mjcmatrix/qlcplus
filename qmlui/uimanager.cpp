@@ -37,6 +37,7 @@ UiManager::UiManager(QQuickView *view, Doc *doc, QObject *parent)
     : QObject(parent)
     , m_view(view)
     , m_doc(doc)
+    , m_uiStyle(nullptr)
     , m_loading(false)
 {
     /** Every change made in the UI settings page is stored automatically,
@@ -50,7 +51,7 @@ UiManager::~UiManager()
 {
 }
 
-void UiManager::initialize()
+bool UiManager::initialize()
 {
     /** Force the creation of the UISettings singleton and
      *  store a reference to it. In this way it is possible
@@ -66,8 +67,13 @@ void UiManager::initialize()
     QObject *item = component.create();
     m_uiStyle = qvariant_cast<QObject*>(item->property("style"));
 
-    /** Store default values first */
-    setDefaultParameter("sizes", "scalingFactor", 1.0);
+    /** Store default values first. The scaling factor default
+     *  might have been already set to fit the current screen */
+    QVariant scaling = getDefault("scalingFactor");
+    setDefaultParameter("sizes", "scalingFactor", scaling.isValid() ? scaling : 1.0);
+    m_loading = true;
+    setModified("scalingFactor", getDefault("scalingFactor"));
+    m_loading = false;
 
     setDefaultParameter("colors", "bgStronger", m_uiStyle->property("bgStronger"));
     setDefaultParameter("colors", "bgStrong", m_uiStyle->property("bgStrong"));
@@ -99,13 +105,27 @@ void UiManager::initialize()
 
     /** Then load (if available) the user configuration. Changes applied
      *  from file must not schedule a save of what has just been read */
+    if (QFile::exists(userConfFilepath()) == false)
+    {
+        /** No user configuration yet. If the scaling factor has been reduced
+         *  to fit the screen, store it so that from now on it is a user setting */
+        if (getDefault("scalingFactor").toReal() < 1.0)
+        {
+            saveSettings();
+            return true;
+        }
+        return false;
+    }
+
     QJsonObject root;
-    if (QFile::exists(userConfFilepath()) && readFromFile(userConfFilepath(), root))
+    if (readFromFile(userConfFilepath(), root))
     {
         m_loading = true;
         applySettings(root);
         m_loading = false;
     }
+
+    return false;
 }
 
 bool UiManager::readFromFile(QString filePath, QJsonObject &root) const
@@ -199,6 +219,23 @@ QString UiManager::userConfFolder() const
 {
     QDir userConfDir = QLCFile::userDirectory(QString(USERQLCPLUSDIR), QString(USERQLCPLUSDIR), QStringList());
     return userConfDir.absolutePath();
+}
+
+void UiManager::setDefaultScalingFactor(qreal factor)
+{
+    UiProperty prop = m_parameterMap.value("scalingFactor");
+
+    /** Follow the new default, unless the user changed it */
+    if (prop.m_modified == prop.m_default)
+        prop.m_modified = factor;
+
+    prop.m_category = "sizes";
+    prop.m_default = factor;
+    m_parameterMap.insert("scalingFactor", prop);
+
+    /** Before initialize() the UI style is not available yet */
+    if (m_uiStyle)
+        m_uiStyle->setProperty("scalingFactor", prop.m_modified);
 }
 
 QString UiManager::userConfFilepath() const

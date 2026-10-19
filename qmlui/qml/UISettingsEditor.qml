@@ -259,7 +259,7 @@ Rectangle
                 imgSource: "qrc:/undo.svg"
                 tooltip: qsTr("Reset to default")
 
-                onClicked: uiManager.setModified("scalingFactor", 1.0)
+                onClicked: uiManager.setModified("scalingFactor", uiManager.getDefault("scalingFactor"))
             }
         }
 

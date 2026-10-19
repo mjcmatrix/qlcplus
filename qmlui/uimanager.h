@@ -42,13 +42,20 @@ public:
     UiManager(QQuickView *view, Doc *doc, QObject *parent = nullptr);
     ~UiManager();
 
-    void initialize();
+    /** Initialize the UI settings and load the user configuration.
+     *  Return true if the scaling factor has been automatically set
+     *  to fit the screen and stored as a user setting */
+    bool initialize();
     void setDefaultParameter(QString category, QString name, QVariant value);
 
     /** Write out any pending UI settings change right away. To be called
      *  when the application is closing, so a change made in the last
      *  second before quitting is not lost */
     void flushSettings();
+
+    /** Set the default scaling factor, evaluated to fit the UI
+     *  on the current screen. A user modified value is preserved */
+    void setDefaultScalingFactor(qreal factor);
 
     Q_INVOKABLE QVariant getDefault(QString name) const;
 
