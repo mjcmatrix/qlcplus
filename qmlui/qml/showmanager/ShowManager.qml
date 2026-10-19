@@ -53,10 +53,26 @@ Rectangle
                                     && tempoLaneButton.checked
     property int laneHeight: tempoLaneVisible ? headerHeight : 0
 
-    onShowIDChanged: renderAndCenter()
+    // true while a Show is being opened, so that the scroll offset it is
+    // given on the way is not taken for the one the user left it at
+    property bool restoringView: false
+
+    onXViewOffsetChanged:
+    {
+        if (!restoringView)
+            showManager.setViewOffset(xViewOffset)
+    }
+
+    onShowIDChanged:
+    {
+        restoringView = showManager.isEditing
+        showManager.renderView(itemsArea.contentItem)
+    }
+
     Component.onCompleted:
     {
-        renderAndCenter()
+        showManager.renderView(itemsArea.contentItem)
+        restoreView()
         syncSelectedTrackIndex()
     }
 
@@ -81,6 +97,7 @@ Rectangle
     {
         target: showManager
         function onSelectedTrackIdChanged() { syncSelectedTrackIndex() }
+        function onViewStateRestored() { restoreView() }
         // a Show with tempo sections always shows them
         function onTempoSectionsChanged()
         {
@@ -189,9 +206,21 @@ Rectangle
 
     function renderAndCenter()
     {
-        //console.log("Show Manager tick size: " + tickSize + "pixel")
         showManager.renderView(itemsArea.contentItem)
         centerView()
+    }
+
+    // scroll to where the user left the Show, unless it is playing, in
+    // which case the cursor is where the view has to be
+    function restoreView()
+    {
+        var offset = showManager.isPlaying ? -1 : showManager.savedViewOffset()
+        restoringView = true
+        if (offset >= 0)
+            xViewOffset = offset
+        else
+            xViewOffset = Math.max(0, cursorPixelX() - (timelineHeader.width / 2))
+        restoringView = false
     }
 
     Rectangle
