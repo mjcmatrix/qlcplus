@@ -210,7 +210,7 @@ jobs:
 
       - name: Smoke test AppImage
         run: |
-          ./qlcplus5-matrix-${APPVERSION}-${{ matrix.asset }}-x86_64.AppImage --platform offscreen --version
+          xvfb-run -a ./qlcplus5-matrix-${APPVERSION}-${{ matrix.asset }}-x86_64.AppImage --version
 
       - name: Store artifact
         uses: actions/upload-artifact@v7
