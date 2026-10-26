@@ -664,26 +664,6 @@ void MonitorProperties::setItemResource(quint32 itemID, QString resource)
     m_genericItems[itemID].m_resource = resource;
 }
 
-QColor MonitorProperties::defaultItemColor()
-{
-    // the 3D view falls back to a diffuse component of 0.64 for a mesh with
-    // no material of its own. Keep the value 8 bit exact, so that a color
-    // saved to a project file compares equal to this one when read back
-    return QColor(163, 163, 163);
-}
-
-QColor MonitorProperties::itemColor(quint32 itemID) const
-{
-    QColor color = m_genericItems[itemID].m_color;
-
-    return color.isValid() ? color : defaultItemColor();
-}
-
-void MonitorProperties::setItemColor(quint32 itemID, QColor color)
-{
-    m_genericItems[itemID].m_color = color;
-}
-
 QVector3D MonitorProperties::itemPosition(quint32 itemID) const
 {
     return m_genericItems[itemID].m_position;
@@ -715,6 +695,16 @@ QVector3D MonitorProperties::itemScale(quint32 itemID) const
 void MonitorProperties::setItemScale(quint32 itemID, QVector3D scale)
 {
     m_genericItems[itemID].m_scale = scale;
+}
+
+QColor MonitorProperties::itemColor(quint32 itemID) const
+{
+    return m_genericItems[itemID].m_color;
+}
+
+void MonitorProperties::setItemColor(quint32 itemID, QColor color)
+{
+    m_genericItems[itemID].m_color = color;
 }
 
 quint32 MonitorProperties::itemFlags(quint32 itemID) const
@@ -995,7 +985,6 @@ bool MonitorProperties::loadXML(QXmlStreamReader &root, const Doc *mainDocument)
             if (tAttrs.hasAttribute(KXMLQLCMonitorItemName))
                 item.m_name = tAttrs.value(KXMLQLCMonitorItemName).toString();
 
-            // no color attribute means an item rendered with the default color
             if (tAttrs.hasAttribute(KXMLQLCMonitorItemColor))
                 item.m_color = QColor(tAttrs.value(KXMLQLCMonitorItemColor).toString());
 
@@ -1244,8 +1233,6 @@ bool MonitorProperties::saveXML(QXmlStreamWriter *doc, const Doc *mainDocument) 
         if (item.m_name.isEmpty() == false)
             doc->writeAttribute(KXMLQLCMonitorItemName, item.m_name);
 
-        // write the color only when one has been explicitly set, so that
-        // projects that don't use custom colors are saved as they were before
         if (item.m_color.isValid())
             doc->writeAttribute(KXMLQLCMonitorItemColor, item.m_color.name());
 

@@ -367,17 +367,6 @@ public:
     QString itemResource(quint32 itemID) const;
     void setItemResource(quint32 itemID, QString resource);
 
-    /** Get/Set the base color for an item with ID $itemID.
-     *  Items with no custom color set report $defaultItemColor */
-    QColor itemColor(quint32 itemID) const;
-    void setItemColor(quint32 itemID, QColor color);
-
-    /** The color reported for a generic item that has no custom color set.
-     *  It is the neutral grey the 3D view renders a mesh with when the mesh
-     *  carries no material of its own, so an item left at this color looks
-     *  exactly like it did before base colors existed */
-    static QColor defaultItemColor();
-
     /** Get/Set the 3D position of an item with ID $itemID */
     QVector3D itemPosition(quint32 itemID) const;
     void setItemPosition(quint32 itemID, QVector3D pos);
@@ -389,6 +378,11 @@ public:
     /** Get/Set the 3D scale of an item with ID $itemID */
     QVector3D itemScale(quint32 itemID) const;
     void setItemScale(quint32 itemID, QVector3D scale);
+
+    /** Get/Set the base color of an item with ID $itemID.
+     *  An invalid color means the item uses its original mesh colors */
+    QColor itemColor(quint32 itemID) const;
+    void setItemColor(quint32 itemID, QColor color);
 
     /** Get/Set the flags of an item with ID $itemID */
     quint32 itemFlags(quint32 itemID) const;

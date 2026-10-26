@@ -50,25 +50,46 @@ Rectangle
 
     onSelFixturesCountChanged: refreshItemValues()
 
-    onSelGenericCountChanged: refreshItemValues()
+    onSelGenericCountChanged:
+    {
+        if (selGenericCount === 0)
+            itemColorTool.visible = false
+        refreshItemValues()
+    }
+
+    // refresh on every selection change of either kind, even when the
+    // count stays the same (e.g. switching from one fixture to another)
+    Connections
+    {
+        target: contextManager
+        function onSelectedFixturesChanged() { settingsRoot.refreshItemValues() }
+    }
+    Connections
+    {
+        target: View3D
+        function onGenericSelectedCountChanged() { settingsRoot.refreshItemValues() }
+    }
 
     // Display the values of the selected item, whatever its type.
     // With more than one item selected, the editable values become
     // relative offsets, so they are reset to a neutral base
     function refreshItemValues()
     {
-        isUpdating = true
         var pos
         var rot
         var scl
+        // read the counts from the backends, as the bound properties
+        // might not be updated yet when this is invoked
+        var fxCount = contextManager ? contextManager.selectedFixturesCount : 0
+        var genCount = View3D.genericSelectedCount
 
-        if (selFixturesCount + selGenericCount > 1)
+        if (fxCount + genCount > 1)
         {
             pos = Qt.vector3d(0, 0, 0)
             rot = Qt.vector3d(0, 0, 0)
             scl = Qt.vector3d(100.0, 100.0, 100.0)
         }
-        else if (selGenericCount == 1)
+        else if (genCount == 1)
         {
             pos = View3D.genericItemsPosition
             rot = View3D.genericItemsRotation
@@ -82,6 +103,7 @@ Rectangle
             scl = currentScale
         }
 
+        isUpdating = true
         lastPosition = pos
         lastRotation = rot
         lastScale = scl
@@ -116,6 +138,44 @@ Rectangle
         function onGenericItemsPositionChanged() { refreshSelectedItemValues() }
         function onGenericItemsRotationChanged() { refreshSelectedItemValues() }
         function onGenericItemsScaleChanged() { refreshSelectedItemValues() }
+}
+
+    ColorTool
+    {
+        id: itemColorTool
+        parent: mainView
+        x: rightPanel.x - settingsRoot.width - width
+        y: UISettings.bigItemHeight
+        visible: false
+        showPalette: false
+
+        onToolColorChanged:
+            function(r, g, b, w, a, uv)
+            {
+                View3D.genericItemsColor = Qt.rgba(r, g, b, 1.0)
+            }
+        onClose: visible = false
+    }
+
+    function toggleItemColorTool()
+    {
+        if (itemColorTool.visible)
+        {
+            itemColorTool.visible = false
+            return
+        }
+
+        itemColorTool.visible = true
+        // ColorTool picks fixture colors when shown. Override with the item one
+        var col = View3D.genericItemsColor
+        itemColorTool.currentRGB = col.valid ? col : Qt.rgba(1, 1, 1, 1)
+    }
+
+    PopupRenameItems
+    {
+        id: itemRenamePopup
+        title: qsTr("Rename item")
+        onAccepted: View3D.genericItemsName = editText
     }
 
     function refreshPositionValues(generic)
@@ -389,6 +449,11 @@ Rectangle
                             if (selGenericCount > 0)
                                 View3D.genericItemsPosition = newPos
                             lastPosition = Qt.vector3d(x, y, z)
+                            // keep in sync with the spin boxes, so a later refresh
+                            // to the same value is not ignored
+                            isUpdating = true
+                            currentPosition = lastPosition
+                            isUpdating = false
                         }
 
                         // row 1
@@ -481,6 +546,9 @@ Rectangle
                             if (selGenericCount > 0)
                                 View3D.genericItemsRotation = newRot
                             lastRotation = Qt.vector3d(x, y, z)
+                            isUpdating = true
+                            currentRotation = lastRotation
+                            isUpdating = false
                         }
 
                         // row 1
@@ -613,8 +681,9 @@ Rectangle
                                 View3D.scaleGenericItems(newScale)
                                 lastScale = Qt.vector3d(x, y, z)
                             }
-                            if (scaleLocked.checked)
-                                currentScale = Qt.vector3d(x, x, x)
+                            isUpdating = true
+                            currentScale = scaleLocked.checked ? Qt.vector3d(x, x, x) : Qt.vector3d(x, y, z)
+                            isUpdating = false
                         }
 
                         // row 1
@@ -820,58 +889,46 @@ Rectangle
                                     tooltip: qsTr("Lock/Unlock the selected items")
                                     onClicked: View3D.toggleGenericItemsLock()
                                 }
+                                IconButton
+                                {
+                                    // a name can be set only on a single item
+                                    enabled: selGenericCount === 1
+                                    height: UISettings.iconSizeMedium
+                                    width: height
+                                    imgSource: "qrc:/rename.svg"
+                                    tooltip: qsTr("Rename the selected item")
+                                    onClicked:
+                                    {
+                                        itemRenamePopup.editText = View3D.genericItemsName
+                                        itemRenamePopup.open()
+                                    }
+                                }
+                                IconButton
+                                {
+                                    enabled: selGenericCount
+                                    height: UISettings.iconSizeMedium
+                                    width: height
+                                    checked: itemColorTool.visible
+                                    faSource: FontAwesome.fa_palette
+                                    faColor: UISettings.fgMain
+                                    tooltip: qsTr("Set the base color of the selected items")
+                                    onClicked: settingsRoot.toggleItemColorTool()
+                                }
+                                IconButton
+                                {
+                                    enabled: selGenericCount
+                                    height: UISettings.iconSizeMedium
+                                    width: height
+                                    faSource: FontAwesome.fa_eraser
+                                    faColor: UISettings.fgMain
+                                    tooltip: qsTr("Restore the original colors of the selected items")
+                                    onClicked: View3D.resetGenericItemsColor()
+                                }
                                 Rectangle
                                 {
                                     Layout.fillWidth: true
                                     height: UISettings.iconSizeMedium
                                     color: "transparent"
-                                }
-                            }
-                        }
-
-                        GridLayout
-                        {
-                            visible: selGenericCount
-                            Layout.fillWidth: true
-                            columns: 2
-                            columnSpacing: 5
-                            rowSpacing: 4
-
-                            // row 1
-                            RobotoText
-                            {
-                                height: UISettings.listItemHeight
-                                label: qsTr("Name")
-                            }
-                            CustomTextEdit
-                            {
-                                Layout.fillWidth: true
-                                height: UISettings.listItemHeight
-                                // a name identifies a single item
-                                enabled: selGenericCount === 1
-                                text: View3D.genericItemsName
-
-                                onTextEdited: View3D.genericItemsName = text
-                            }
-
-                            // row 2
-                            RobotoText
-                            {
-                                height: UISettings.listItemHeight
-                                label: qsTr("Color")
-                            }
-                            Rectangle
-                            {
-                                Layout.fillWidth: true
-                                height: UISettings.listItemHeight
-                                color: View3D.genericItemsColor
-                                border.width: 1
-                                border.color: UISettings.bgLight
-
-                                MouseArea
-                                {
-                                    anchors.fill: parent
-                                    onClicked: itemColorTool.visible = !itemColorTool.visible
                                 }
                             }
                         }
@@ -925,16 +982,35 @@ Rectangle
                                         }
                                     }
 
-                                    Text
+                                    Row
                                     {
-                                        visible: isLocked
                                         anchors.right: parent.right
                                         anchors.rightMargin: 6
                                         anchors.verticalCenter: parent.verticalCenter
-                                        color: "#00FF00"
-                                        font.family: UISettings.fontAwesomeFontName
-                                        font.pixelSize: UISettings.listItemHeight * 0.6
-                                        text: FontAwesome.fa_lock
+                                        spacing: 4
+
+                                        Text
+                                        {
+                                            visible: isLocked
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            color: "#00FF00"
+                                            font.family: UISettings.fontAwesomeFontName
+                                            font.pixelSize: UISettings.listItemHeight * 0.6
+                                            text: FontAwesome.fa_lock
+                                        }
+
+                                        // custom base color, if set
+                                        Rectangle
+                                        {
+                                            visible: model.itemColor.valid
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            width: UISettings.listItemHeight * 0.6
+                                            height: width
+                                            radius: 2
+                                            color: model.itemColor.valid ? model.itemColor : "transparent"
+                                            border.width: 1
+                                            border.color: UISettings.borderColorDark
+                                        }
                                     }
                                 }
                         }
@@ -943,23 +1019,6 @@ Rectangle
         } // Column
         ScrollBar.vertical: CustomScrollBar { id: sbar }
     } // Flickable
-
-    ColorTool
-    {
-        id: itemColorTool
-        // open to the left of the panel, where there is room for it
-        x: -width
-        y: (settingsRoot.height - height) / 2
-        z: 10
-        visible: false
-
-        onToolColorChanged:
-            function(r, g, b, w, a, uv)
-            {
-                View3D.genericItemsColor = Qt.rgba(r, g, b, 1.0)
-            }
-        onClose: visible = false
-    }
 
     ColorTool
     {

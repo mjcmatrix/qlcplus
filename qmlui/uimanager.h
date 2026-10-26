@@ -22,6 +22,7 @@
 
 #include <QQuickView>
 #include <QJsonObject>
+#include <QPointer>
 #include <QObject>
 #include <QTimer>
 
@@ -100,7 +101,8 @@ private:
     Doc *m_doc;
 
     /** Reference to the UI QML settings */
-    QObject *m_uiStyle;
+    /** The QML UISettings singleton, guarded since owned by the QML engine */
+    QPointer<QObject> m_uiStyle;
 
     /** A map ok key,value representing every UI parameter
      *  that can be changed at runtime */

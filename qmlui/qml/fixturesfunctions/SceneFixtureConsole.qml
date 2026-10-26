@@ -31,8 +31,21 @@ Rectangle
     color: "transparent"
     objectName: "sceneFixtureConsole"
 
-    Component.onCompleted: sceneEditor.sceneConsoleLoaded(true)
-    Component.onDestruction: sceneEditor.sceneConsoleLoaded(false)
+    /** Keep the backend that created this view: a new editor may already
+     *  be installed in the global context when old delegates finish their destruction */
+    property var consoleEditor: sceneEditor
+
+    Component.onCompleted:
+    {
+        consoleEditor = sceneEditor
+        if (consoleEditor)
+            consoleEditor.sceneConsoleLoaded(true, sfcContainer)
+    }
+    Component.onDestruction:
+    {
+        if (consoleEditor)
+            consoleEditor.sceneConsoleLoaded(false, sfcContainer)
+    }
 
     property bool isSceneEditor: true
     property bool multipleSelection: false
@@ -53,7 +66,7 @@ Rectangle
      *  by the Scene editor through the standard Fixture selection */
     Connections
     {
-        target: sceneEditor
+        target: sfcContainer.consoleEditor
         ignoreUnknownSignals: true
 
         function onExternalMapChanged()
@@ -80,7 +93,7 @@ Rectangle
         width: parent.width
         height: parent.height - (fxScrollBar.visible ? fxScrollBar.height : 0)
         orientation: ListView.Horizontal
-        model: sceneEditor.fixtureList
+        model: sfcContainer.consoleEditor ? sfcContainer.consoleEditor.fixtureList : null
         boundsBehavior: Flickable.StopAtBounds
         highlightFollowsCurrentItem: false
         currentIndex: -1
@@ -94,8 +107,16 @@ Rectangle
                 width: fxConsole.width + 4
                 color: UISettings.bgMedium
 
-                Component.onCompleted: sceneEditor.registerFixtureConsole(index, fxConsole)
-                Component.onDestruction: sceneEditor.unRegisterFixtureConsole(index)
+                Component.onCompleted:
+                {
+                    if (sfcContainer.consoleEditor)
+                        sfcContainer.consoleEditor.registerFixtureConsole(index, fxConsole)
+                }
+                Component.onDestruction:
+                {
+                    if (sfcContainer.consoleEditor)
+                        sfcContainer.consoleEditor.unRegisterFixtureConsole(index, fxConsole)
+                }
 
                 FixtureConsole
                 {

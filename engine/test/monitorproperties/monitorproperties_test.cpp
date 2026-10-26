@@ -244,8 +244,8 @@ void MonitorProperties_Test::genericItems()
     QCOMPARE(mp.itemScale(id), QVector3D(2,2,2));
     QCOMPARE(mp.itemFlags(id), quint32(MonitorProperties::InvertedPanFlag));
 
-    // an item with no custom color reports the default one
-    QCOMPARE(mp.itemColor(id), MonitorProperties::defaultItemColor());
+    // an item with no custom color keeps its original mesh colors
+    QCOMPARE(mp.itemColor(id).isValid(), false);
 
     mp.setItemColor(id, QColor(Qt::blue));
     QCOMPARE(mp.itemColor(id), QColor(Qt::blue));
@@ -304,10 +304,10 @@ void MonitorProperties_Test::genericItemsXML()
     QCOMPARE(loaded.itemColor(1), QColor(Qt::red));
     QCOMPARE(loaded.itemPosition(1), QVector3D(1000, 0, 2000));
 
-    // an item saved with no color reads back as the default one, and keeps
+    // an item saved with no color reads back with no color, and keeps
     // taking its name from the mesh file
     QCOMPARE(loaded.itemName(2), QString("cube"));
-    QCOMPARE(loaded.itemColor(2), MonitorProperties::defaultItemColor());
+    QCOMPARE(loaded.itemColor(2).isValid(), false);
 }
 
 void MonitorProperties_Test::reset()
