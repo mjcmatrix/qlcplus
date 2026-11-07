@@ -229,7 +229,9 @@ bool ChaserEditor::moveSteps(QVariantList indicesList, int insertIndex)
         }
 
         qDebug() << "Moving step from" << index << "to" << insIdx;
-        Tardis::instance()->enqueueAction(Tardis::ChaserMoveStep, m_chaser->id(), index, insIdx);
+        Tardis::instance()->enqueueAction(Tardis::ChaserMoveStep, m_chaser->id(),
+                                          QVariant::fromValue(UIntPair(insIdx, index)),
+                                          QVariant::fromValue(UIntPair(index, insIdx)));
         m_chaser->moveStep(index, insIdx);
 
         if (index > insIdx)
@@ -305,7 +307,13 @@ bool ChaserEditor::shuffleSteps(QVariantList indicesList)
 
         if (indexToShuffle != lastUnshuffledIndex)
         {
+            Tardis::instance()->enqueueAction(Tardis::ChaserMoveStep, m_chaser->id(),
+                                              QVariant::fromValue(UIntPair(lastUnshuffledIndex, indexToShuffle)),
+                                              QVariant::fromValue(UIntPair(indexToShuffle, lastUnshuffledIndex)));
             m_chaser->moveStep(indexToShuffle, lastUnshuffledIndex);
+            Tardis::instance()->enqueueAction(Tardis::ChaserMoveStep, m_chaser->id(),
+                                              QVariant::fromValue(UIntPair(indexToShuffle, lastUnshuffledIndex - 1)),
+                                              QVariant::fromValue(UIntPair(lastUnshuffledIndex - 1, indexToShuffle)));
             m_chaser->moveStep(lastUnshuffledIndex - 1, indexToShuffle);
         }
     }
@@ -325,6 +333,15 @@ void ChaserEditor::setSequenceStepValue(SceneValue &scv)
         return;
 
     ChaserStep step = m_chaser->steps().at(m_playbackIndex);
+
+    QVariant oldValue;
+    int valIndex = step.values.indexOf(scv);
+    if (valIndex != -1)
+        oldValue = QVariantList({ m_playbackIndex, QVariant::fromValue(step.values.at(valIndex)) });
+
+    Tardis::instance()->enqueueAction(Tardis::ChaserSetStepValue, m_chaser->id(), oldValue,
+                                      QVariantList({ m_playbackIndex, QVariant::fromValue(scv) }));
+
     step.setValue(scv);
     m_chaser->replaceStep(step, m_playbackIndex);
 }
@@ -465,7 +482,11 @@ void ChaserEditor::removeFixtures(QVariantList list)
         {
             SceneValue scv = it.next();
             if (fixtureIdList.contains(scv.fxi))
+            {
+                Tardis::instance()->enqueueAction(Tardis::ChaserUnsetStepValue, m_chaser->id(),
+                                                  QVariantList({ i, QVariant::fromValue(scv) }), QVariant());
                 it.remove();
+            }
         }
     }
 }
@@ -762,6 +783,7 @@ void ChaserEditor::setStepsFadeIn(int stepsFadeIn)
     if (m_chaser == nullptr || m_chaser->fadeInMode() == Chaser::SpeedMode(stepsFadeIn))
         return;
 
+    Tardis::instance()->enqueueAction(Tardis::ChaserSetFadeInMode, m_chaser->id(), m_chaser->fadeInMode(), stepsFadeIn);
     m_chaser->setFadeInMode(Chaser::SpeedMode(stepsFadeIn));
 
     emit stepsFadeInChanged(stepsFadeIn);
@@ -782,6 +804,7 @@ void ChaserEditor::setStepsFadeOut(int stepsFadeOut)
     if (m_chaser == nullptr || m_chaser->fadeOutMode() == Chaser::SpeedMode(stepsFadeOut))
         return;
 
+    Tardis::instance()->enqueueAction(Tardis::ChaserSetFadeOutMode, m_chaser->id(), m_chaser->fadeOutMode(), stepsFadeOut);
     m_chaser->setFadeOutMode(Chaser::SpeedMode(stepsFadeOut));
 
     emit stepsFadeOutChanged(stepsFadeOut);
@@ -802,6 +825,7 @@ void ChaserEditor::setStepsDuration(int stepsDuration)
     if (m_chaser == nullptr || m_chaser->durationMode() == Chaser::SpeedMode(stepsDuration))
         return;
 
+    Tardis::instance()->enqueueAction(Tardis::ChaserSetDurationMode, m_chaser->id(), m_chaser->durationMode(), stepsDuration);
     m_chaser->setDurationMode(Chaser::SpeedMode(stepsDuration));
 
     emit stepsDurationChanged(stepsDuration);
@@ -816,6 +840,7 @@ void ChaserEditor::autoSetDurations()
 
     if (m_chaser->durationMode() != Chaser::PerStep)
     {
+        Tardis::instance()->enqueueAction(Tardis::ChaserSetDurationMode, m_chaser->id(), m_chaser->durationMode(), Chaser::PerStep);
         m_chaser->setDurationMode(Chaser::PerStep);
         emit stepsDurationChanged(Chaser::PerStep);
     }
@@ -924,6 +949,9 @@ void ChaserEditor::setStepNote(int index, QString text)
         return;
 
     ChaserStep step = m_chaser->steps().at(int(index));
+    Tardis::instance()->enqueueAction(Tardis::ChaserSetStepNote, m_chaser->id(),
+                                      QVariant::fromValue(StringIntPair(step.note, index)),
+                                      QVariant::fromValue(StringIntPair(text, index)));
     step.note = text;
     m_chaser->replaceStep(step, index);
 

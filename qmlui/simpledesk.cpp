@@ -231,7 +231,7 @@ void SimpleDesk::setValue(quint32 fixtureID, uint channel, uchar value)
     if (m_values.contains(start + channel))
     {
         //currScv.fxi = fixtureID;
-        currScv.channel = channel;
+        currScv.channel = start + channel;
         currScv.value = m_values[start + channel];
     }
     currentVal.setValue(currScv);
@@ -242,7 +242,7 @@ void SimpleDesk::setValue(quint32 fixtureID, uint channel, uchar value)
     m_channelList->setData(mIndex, value, UserRoleChannelValue);
     m_channelList->setData(mIndex, true, UserRoleChannelOverride);
 
-    newVal.setValue(SceneValue(Fixture::invalidId(), channel, value));
+    newVal.setValue(SceneValue(Fixture::invalidId(), start + channel, value));
     Tardis::instance()->enqueueAction(Tardis::SimpleDeskSetChannel, 0, currentVal, newVal);
 
     if (fixture != nullptr)
@@ -275,6 +275,7 @@ void SimpleDesk::resetUniverse(int universe)
 {
     // remove values previously set on universe
     QMutexLocker locker(&m_mutex);
+    QVariantList oldValues;
     QHashIterator <uint,uchar> it(m_values);
     while (it.hasNext() == true)
     {
@@ -283,6 +284,7 @@ void SimpleDesk::resetUniverse(int universe)
         int uni = absChannel >> 9;
         if (uni == universe)
         {
+            oldValues.append(QVariant::fromValue(SceneValue(Fixture::invalidId(), absChannel, it.value())));
             m_values.remove(absChannel);
 
             // remove the override flag from the displayed channel
@@ -295,6 +297,9 @@ void SimpleDesk::resetUniverse(int universe)
 
     // add command to queue. Will be taken care of at the next writeDMX call
     m_commandQueue.append(QPair<int,quint32>(ResetUniverse, universe));
+
+    Tardis::instance()->enqueueAction(Tardis::SimpleDeskResetUniverse, 0, oldValues, universe);
+
     setChanged(true);
 }
 
@@ -308,7 +313,7 @@ void SimpleDesk::resetChannel(uint channel)
     if (m_values.contains(start + channel) == false)
         return;
 
-    currScv.channel = channel;
+    currScv.channel = start + channel;
     currScv.value = m_values[start + channel];
     currentVal.setValue(currScv);
     m_values.remove(start + channel);
@@ -686,6 +691,8 @@ void SimpleDesk::writeDMX(MasterTimer *timer, QList<Universe *> ua)
             it.next();
             int uni = it.key() >> 9;
             int address = it.key();
+            if (uni >= ua.count())
+                continue;
             uchar value = it.value();
             quint32 fxID = m_doc->fixtureForAddress(address);
             quint32 channel = address;

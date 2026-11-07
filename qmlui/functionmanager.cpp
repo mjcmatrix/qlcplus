@@ -102,6 +102,9 @@ quint32 FunctionManager::startupFunctionID() const
 
 void FunctionManager::setStartupFunctionID(quint32 fid)
 {
+    Tardis::instance()->enqueueAction(Tardis::FunctionSetAutostart, fid, m_doc->startupFunction(),
+                                      fid == m_doc->startupFunction() ? Function::invalidId() : fid);
+
     if (fid == m_doc->startupFunction())
         m_doc->setStartupFunction(Function::invalidId());
     else
@@ -305,6 +308,9 @@ quint32 FunctionManager::createFunction(int type, QVariantList fixturesList)
                     }
                 }
 
+                Tardis::instance()->enqueueAction(Tardis::FunctionCreate, scene->id(), QVariant(),
+                                                  Tardis::instance()->actionToByteArray(Tardis::FunctionCreate, scene->id()));
+
                 f = new Sequence(m_doc);
                 name = tr("New Sequence");
                 Sequence *sequence = qobject_cast<Sequence *>(f);
@@ -442,6 +448,7 @@ quint32 FunctionManager::createAudioVideoFunction(int type, QStringList fileList
                     if (lastFuncID != Function::invalidId())
                     {
                         Audio *audio = qobject_cast<Audio *>(f);
+                        Tardis::instance()->enqueueAction(Tardis::AudioSetSource, audio->id(), QString(), filePath);
                         audio->setSourceFileName(filePath);
                     }
                 }
@@ -470,6 +477,7 @@ quint32 FunctionManager::createAudioVideoFunction(int type, QStringList fileList
                     if (lastFuncID != Function::invalidId())
                     {
                         Video *video = qobject_cast<Video *>(f);
+                        Tardis::instance()->enqueueAction(Tardis::VideoSetSource, video->id(), QString(), filePath);
                         video->setSourceUrl(filePath);
                     }
                 }
@@ -1238,9 +1246,16 @@ bool FunctionManager::cloneFunctions(QString customName)
                 {
                     Function *sceneCopy = scene->createCopy(m_doc);
                     if (sceneCopy != nullptr)
+                    {
                         sequence->setBoundSceneID(sceneCopy->id());
+                        Tardis::instance()->enqueueAction(Tardis::FunctionCreate, sceneCopy->id(), QVariant(),
+                                                          Tardis::instance()->actionToByteArray(Tardis::FunctionCreate, sceneCopy->id()));
+                    }
                 }
             }
+
+            Tardis::instance()->enqueueAction(Tardis::FunctionCreate, copy->id(), QVariant(),
+                                              Tardis::instance()->actionToByteArray(Tardis::FunctionCreate, copy->id()));
         }
     }
 
@@ -1825,7 +1840,18 @@ void FunctionManager::dumpDmxValues(QList<SceneValue> dumpValues, QList<quint32>
     }
 
     for (SceneValue &scv : dumpedValues)
+    {
+        // a new Scene is sent as a whole when added to the project
+        if (sceneID != Function::invalidId() && targetSequence == nullptr)
+        {
+            QVariant currentVal;
+            if (targetScene->checkValue(scv))
+                currentVal.setValue(SceneValue(scv.fxi, scv.channel, targetScene->value(scv.fxi, scv.channel)));
+            Tardis::instance()->enqueueAction(Tardis::SceneSetChannelValue, targetScene->id(), currentVal,
+                                              QVariant::fromValue(scv));
+        }
         targetScene->setValue(scv);
+    }
 
     if (targetSequence != nullptr)
     {

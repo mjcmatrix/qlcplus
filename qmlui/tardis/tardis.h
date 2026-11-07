@@ -106,6 +106,7 @@ public:
         FunctionSetFadeIn,
         FunctionSetFadeOut,
         FunctionSetDuration,
+        FunctionSetAutostart,
 
         /* Scene editing actions */
         SceneSetChannelValue = 0x1100,
@@ -126,6 +127,12 @@ public:
         ChaserSetStepFadeOut,
         ChaserSetStepDuration,
         FunctionSetState,           // a whole Chaser or EFX, as XML (tempo conversion)
+        ChaserSetFadeInMode,
+        ChaserSetFadeOutMode,
+        ChaserSetDurationMode,
+        ChaserSetStepNote,
+        ChaserSetStepValue,
+        ChaserUnsetStepValue,
 
         /* EFX editing actions */
         EFXAddFixture = 0x1300,
@@ -143,6 +150,10 @@ public:
         EFXSetYFrequency,
         EFXSetXPhase,
         EFXSetYPhase,
+        EFXSetDimmerControl,
+        EFXSetFixtureMode,
+        EFXSetFixtureReversed,
+        EFXSetFixtureOffset,
 
         /* Collection editing actions */
         CollectionAddFunction = 0x1400,
@@ -164,6 +175,8 @@ public:
         RGBMatrixSetImage,
         RGBMatrixSetOffset,
         RGBMatrixSetAnimationStyle,
+        RGBMatrixSetBlendMode,
+        RGBMatrixSetControlMode,
 
         /* Audio editing actions */
         AudioSetSource = 0x1600,
@@ -177,6 +190,9 @@ public:
         VideoSetRotation,
         VideoSetLayer,
 
+        /* Script editing actions */
+        ScriptSetContent = 0x1800,
+
         /* Show Manager actions */
         ShowManagerAddTrack = 0xB000,
         ShowManagerDeleteTrack,
@@ -188,10 +204,15 @@ public:
         ShowManagerSetTempoMap,     // objID: Show ID, value: tempo map XML
         ShowManagerItemSetFunction, // objID: item ID in the current Show, value: Function ID
         ShowManagerShowItemSetTimes,// objID: Show ID, value: { item ID, start time, duration }
+        ShowManagerSetTimeDivision,
+        ShowManagerTrackSetMute,
+        ShowManagerMoveTrack,
+        ShowManagerItemSetLock,
 
         /* Simple Desk actions */
         SimpleDeskSetChannel = 0xC000,
         SimpleDeskResetChannel,
+        SimpleDeskResetUniverse,
 
         /* Virtual console editing actions */
         VCWidgetCreate = 0xE000,

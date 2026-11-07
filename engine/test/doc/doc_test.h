@@ -48,8 +48,8 @@ private slots:
     void movedFixtureChannels();
     void deletedFixtureChannels();
     void renamedFixtureKeepsValues();
-    void movedFixtureOverFixtureInBetween();
     void movedFixtureBeyondUniverse();
+    void movedFixtureOverFixtureInBetween();
     void replaceFixtures();
     void fixture();
     void totalPowerConsumption();
