@@ -248,44 +248,35 @@ Rectangle
             CustomComboBox
             {
                 id: showSelector
-                Layout.preferredWidth: showMgrContainer.width * 0.15
-                editable: true
+                Layout.preferredWidth: showMgrContainer.width * 0.1575
                 enabled: showManager.showsList.length > 0
 
                 model: showManager.showsList
                 currValue: showManager.currentShowID
 
                 /* Picking an entry from the drop-down opens that Show for
-                   editing. Typing in the text field renames the current one.
-                   Neither valueChanged nor editTextChanged can be used here:
-                   both also fire while the combo box initializes itself or
-                   when the model changes, which would open or rename a Show
-                   behind the user's back */
+                   editing. valueChanged can't be used here: it also fires
+                   while the combo box initializes itself or when the model
+                   changes, which would open a Show behind the user's back */
                 onUserSelected:
                     function(value)
                     {
                         showManager.currentShowID = value
                     }
 
-                /* The Show list is sorted by name, so renaming on every
-                   keystroke would reorder the model under the text field
-                   being typed into. Commit the new name in one go instead,
-                   which also keeps the rename to a single undo step */
-                onEditingFinished:
-                    function(text)
-                    {
-                        showManager.showName = text
-                    }
-
                 /* CustomComboBox assigns currValue internally, which breaks
                    the binding above: restore it when the Show is opened or
-                   closed from elsewhere (e.g. the Function Manager). With no
-                   Show loaded the combo box falls back to its first entry,
-                   so the text is blanked to not suggest one is being edited */
+                   closed from elsewhere (e.g. the Function Manager), or
+                   renamed. With no Show loaded the combo box keeps showing
+                   the last entry it matched, so the text is blanked to not
+                   suggest one is being edited */
                 function syncToCurrentShow()
                 {
                     currValue = showManager.currentShowID
-                    editText = showManager.isEditing ? showManager.showName : ""
+                    if (showManager.isEditing)
+                        updateFromValue()
+                    else
+                        displayText = ""
                 }
 
                 Component.onCompleted: syncToCurrentShow()
@@ -295,6 +286,33 @@ Rectangle
                     target: showManager
                     function onCurrentShowIDChanged() { showSelector.syncToCurrentShow() }
                     function onShowsListChanged() { Qt.callLater(showSelector.syncToCurrentShow) }
+                }
+            }
+
+            IconButton
+            {
+                id: renameShowButton
+                z: 2
+                width: parent.height - 6
+                height: width
+                imgSource: "qrc:/rename.svg"
+                enabled: showManager.isEditing
+                tooltip: qsTr("Rename the current Show")
+                onClicked:
+                {
+                    renameShowPopup.editText = showManager.showName
+                    renameShowPopup.open()
+                }
+
+                PopupRenameItems
+                {
+                    id: renameShowPopup
+                    title: qsTr("Rename Show")
+                    onAccepted:
+                    {
+                        if (editText.length && editText !== showManager.showName)
+                            showManager.showName = editText
+                    }
                 }
             }
 
