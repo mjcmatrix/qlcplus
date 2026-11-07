@@ -238,6 +238,10 @@ void ShowManager::setShowName(QString showName)
     if (m_currentShow == nullptr || m_currentShow->name() == showName)
         return;
 
+    // Function names must be unique
+    if (m_doc->functionByName(showName) != nullptr)
+        return;
+
     Tardis::instance()->enqueueAction(Tardis::FunctionSetName, m_currentShow->id(), m_currentShow->name(), showName);
 
     m_currentShow->setName(showName);

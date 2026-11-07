@@ -122,7 +122,8 @@ public:
     /** Return the name of the Show Function being edited */
     QString showName() const;
 
-    /** Set the name of the Show Function to edit */
+    /** Set the name of the Show Function to edit. The name is not
+     *  changed if another Function already uses it */
     void setShowName(QString showName);
 
     /** Return the list of the Show Functions available in the workspace,

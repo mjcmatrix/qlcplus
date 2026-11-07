@@ -310,9 +310,23 @@ Rectangle
                     title: qsTr("Rename Show")
                     onAccepted:
                     {
-                        if (editText.length && editText !== showManager.showName)
-                            showManager.showName = editText
+                        if (editText.length === 0 || editText === showManager.showName)
+                            return
+
+                        showManager.showName = editText
+                        if (showManager.showName !== editText)
+                            showNameErrorPopup.open()
                     }
+                }
+
+                CustomPopupDialog
+                {
+                    id: showNameErrorPopup
+                    title: qsTr("Error")
+                    message: qsTr("An item with the same name already exists.\nPlease provide a different name.")
+                    standardButtons: Dialog.Ok
+                    // go back to the name entry dialog, keeping the entered text
+                    onAccepted: renameShowPopup.open()
                 }
             }
 
