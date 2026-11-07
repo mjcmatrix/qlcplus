@@ -1435,6 +1435,58 @@ void EFXTempoMap_Test::masterTempoPaused()
     QCOMPARE(timer->bpmNumber(), 120);
 }
 
+void EFXTempoMap_Test::masterTempoShowChanged()
+{
+    TempoMap mapA;
+    mapA.addSection(TempoSection(0, 60000, 127.5));
+    Show *showA = createShow(mapA);
+    showA->setMasterTempo(true);
+    addItem(showA, createEFX(1, 4)->id(), 0, 30000);
+
+    TempoMap mapB;
+    mapB.addSection(TempoSection(0, 60000, 150));
+    Show *showB = createShow(mapB);
+    showB->setMasterTempo(true);
+    addItem(showB, createEFX(1, 4)->id(), 0, 30000);
+
+    MasterTimer *timer = m_doc->masterTimer();
+    QSignalSpy spy(timer, SIGNAL(showTempoChanged(quint32,double)));
+
+    // the exact BPM is given, while bpmNumber() is rounded
+    showA->start(timer, FunctionParent::master());
+    tick(10);
+    QCOMPARE(spy.count(), 1);
+    QCOMPARE(spy.last().at(0).toUInt(), showA->id());
+    QCOMPARE(spy.last().at(1).toDouble(), 127.5);
+    QCOMPARE(timer->bpmNumber(), 128);
+
+    // another Show takes over
+    showB->start(timer, FunctionParent::master());
+    tick(10);
+    QCOMPARE(spy.count(), 2);
+    QCOMPARE(spy.last().at(0).toUInt(), showB->id());
+    QCOMPARE(spy.last().at(1).toDouble(), 150.0);
+
+    // an external beat source wins: no Show sets the master tempo
+    timer->setBeatSourceType(MasterTimer::External);
+    tick(3);
+    QCOMPARE(spy.count(), 3);
+    QCOMPARE(spy.last().at(0).toUInt(), Function::invalidId());
+    QVERIFY(timer->showTempoActive() == false);
+    QCOMPARE(timer->bpmNumber(), 120);
+
+    timer->setBeatSourceType(MasterTimer::None);
+    tick(3);
+    QCOMPARE(spy.count(), 4);
+    QCOMPARE(spy.last().at(0).toUInt(), showB->id());
+
+    showB->stop(FunctionParent::master());
+    showA->stop(FunctionParent::master());
+    tick(5);
+    QCOMPARE(spy.last().at(0).toUInt(), Function::invalidId());
+    QVERIFY(timer->showTempoActive() == false);
+}
+
 void EFXTempoMap_Test::masterTempoSaveLoad()
 {
     Show *show = createShow(TempoMap());

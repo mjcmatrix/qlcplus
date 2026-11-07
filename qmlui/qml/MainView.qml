@@ -487,7 +487,11 @@ Rectangle
             // ################## BEATS ##################
             RobotoText
             {
-                label: "BPM: " + (ioManager.bpmNumber > 0 ? ioManager.bpmNumber : qsTr("Off"))
+                // a Show setting the master tempo gives the BPM: tell so,
+                // with its exact value (e.g. 127.5, not 128)
+                label: ioManager.showTempoActive ?
+                           "BPM: " + Number(ioManager.showTempoBpm.toFixed(2)) + " (" + qsTr("Show") + ")" :
+                           "BPM: " + (ioManager.bpmNumber > 0 ? ioManager.bpmNumber : qsTr("Off"))
                 color: gsMouseArea.containsMouse ? UISettings.bgLight : "transparent"
                 fontSize: UISettings.textSizeDefault
                 Layout.alignment: Qt.AlignTop
@@ -500,6 +504,10 @@ Rectangle
                     anchors.fill: parent
                     hoverEnabled: true
                     onClicked: beatSelectionPanel.visible = !beatSelectionPanel.visible
+
+                    ToolTip.visible: containsMouse && ioManager.showTempoActive
+                    ToolTip.delay: 500
+                    ToolTip.text: qsTr("Master tempo set by the Show \"%1\"").arg(ioManager.showTempoName)
                 }
                 BeatGeneratorsPanel
                 {
@@ -560,6 +568,28 @@ Rectangle
                 Layout.alignment: Qt.AlignTop
                 implicitWidth: width
                 implicitHeight: parent.height
+
+                MouseArea
+                {
+                    id: showTempoMouseArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.NoButton
+
+                    // this follows the Show open in the Show Manager, which
+                    // may not be the one setting the master tempo
+                    ToolTip.visible: containsMouse
+                    ToolTip.delay: 500
+                    ToolTip.text:
+                    {
+                        var text = qsTr("Tempo sections of the Show \"%1\" open in the Show Manager").arg(showManager.showName)
+                        if (ioManager.showTempoActive === false)
+                            return text
+                        if (ioManager.showTempoId === showManager.currentShowID)
+                            return text + "\n" + qsTr("This Show sets the master tempo (BPM)")
+                        return text + "\n" + qsTr("The master tempo (BPM) is set by the Show \"%1\"").arg(ioManager.showTempoName)
+                    }
+                }
             }
 
             // ################## SHOW TEMPO BEAT/BAR ##################

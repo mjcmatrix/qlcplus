@@ -271,10 +271,19 @@ public:
      *  or disabled. The BPM and the beats are then those of the Show */
     bool showTempoActive() const;
 
+signals:
+    /** Emitted from the MasterTimer thread when the Show setting the master
+     *  tempo, or its exact BPM, changes. $showId is Function::invalidId()
+     *  when no Show sets it anymore */
+    void showTempoChanged(quint32 showId, double bpm);
+
 private:
     /** Generate the beats and the BPM of the Show setting the master tempo
      *  for this tick. Returns false if no Show sets it */
     bool generateShowTempoBeat();
+
+    /** Stop following the tempo of a Show for the BPM and the beats */
+    void deactivateShowTempo();
 
 private:
     /** The number of ticks since the MasterTimer was created */
@@ -291,6 +300,8 @@ private:
     /** True while the Show tempo sets the BPM and the beats */
     bool m_showTempoActive;
     double m_showTempoBpm;
+    /** The ID of the Show whose tempo m_showTempoActive follows */
+    quint32 m_showTempoActiveId;
     /** The Show grid position at the last tick, or -1 */
     double m_showGridPosition;
     bool m_showTempoWasPaused;

@@ -54,6 +54,10 @@ class InputOutputManager final : public PreviewContext
 
     Q_PROPERTY(QString beatType READ beatType WRITE setBeatType NOTIFY beatTypeChanged)
     Q_PROPERTY(int bpmNumber READ bpmNumber WRITE setBpmNumber NOTIFY bpmNumberChanged)
+    Q_PROPERTY(bool showTempoActive READ showTempoActive NOTIFY showTempoChanged)
+    Q_PROPERTY(quint32 showTempoId READ showTempoId NOTIFY showTempoChanged)
+    Q_PROPERTY(QString showTempoName READ showTempoName NOTIFY showTempoChanged)
+    Q_PROPERTY(double showTempoBpm READ showTempoBpm NOTIFY showTempoChanged)
 
     Q_PROPERTY(QString profileUserFolder READ profileUserFolder CONSTANT)
 
@@ -207,16 +211,32 @@ public:
     int bpmNumber() const;
     void setBpmNumber(int bpmNumber);
 
+    /** Returns true while a Show sets the master tempo (see
+     *  MasterTimer::showTempoActive()) */
+    bool showTempoActive() const;
+
+    /** Get the ID and the name of the Show setting the master tempo */
+    quint32 showTempoId() const;
+    QString showTempoName() const;
+
+    /** Get the exact BPM of the Show setting the master tempo */
+    double showTempoBpm() const;
+
 signals:
     void beatTypeChanged(QString beatType);
     void beat();
     void bpmNumberChanged(int bpmNumber);
+    void showTempoChanged();
 
 protected slots:
     void slotBeatTypeChanged();
+    void slotShowTempoChanged(quint32 showId, double bpm);
+    void slotFunctionNameChanged(quint32 id);
 
 private:
     QString m_beatType;
+    quint32 m_showTempoId;
+    double m_showTempoBpm;
 };
 
 #endif // INPUTOUTPUTMANAGER_H
