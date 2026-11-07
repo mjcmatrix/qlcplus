@@ -82,6 +82,7 @@ private slots:
     void masterTempoChaser();
     void twoMasterTempoShows();
     void masterTempoPaused();
+    void masterTempoShowChanged();
     void masterTempoSaveLoad();
 
 private:

@@ -78,6 +78,7 @@ MasterTimer::MasterTimer(Doc* doc)
     , m_showTempoPaused(false)
     , m_showTempoActive(false)
     , m_showTempoBpm(0)
+    , m_showTempoActiveId(Function::invalidId())
     , m_showGridPosition(-1)
     , m_showTempoWasPaused(false)
 {
@@ -132,7 +133,11 @@ void MasterTimer::timerTick()
 
     // a Show setting the master tempo stands in for the internal beat
     // generator (or the lack of one), never for an external source
-    bool showBeats = m_beatSourceType != External && generateShowTempoBeat();
+    bool showBeats = false;
+    if (m_beatSourceType == External)
+        deactivateShowTempo();
+    else
+        showBeats = generateShowTempoBeat();
 
     switch (showBeats ? External : m_beatSourceType)
     {
@@ -524,6 +529,19 @@ bool MasterTimer::showTempoActive() const
     return m_showTempoActive;
 }
 
+void MasterTimer::deactivateShowTempo()
+{
+    m_showGridPosition = -1;
+
+    if (m_showTempoActive == false)
+        return;
+
+    m_showTempoActive = false;
+    m_showTempoActiveId = Function::invalidId();
+    emit bpmNumberChanged(m_currentBPM);
+    emit showTempoChanged(Function::invalidId(), 0);
+}
+
 bool MasterTimer::generateShowTempoBeat()
 {
     bool wasActive = m_showTempoActive;
@@ -533,10 +551,7 @@ bool MasterTimer::generateShowTempoBeat()
 
     if (tempoMap == NULL || tempoMap->isBeforeSections(time))
     {
-        m_showTempoActive = false;
-        m_showGridPosition = -1;
-        if (wasActive)
-            emit bpmNumberChanged(m_currentBPM);
+        deactivateShowTempo();
         return false;
     }
 
@@ -569,13 +584,18 @@ bool MasterTimer::generateShowTempoBeat()
     }
     m_showTempoWasPaused = paused;
 
+    bool showChanged = wasActive == false || m_showTempoActiveId != m_showTempoId ||
+                       bpm != m_showTempoBpm;
+    bool bpmNumberChange = wasActive == false || qRound(bpm) != qRound(m_showTempoBpm);
+
     m_showTempoActive = true;
-    if (wasActive == false || qRound(bpm) != qRound(m_showTempoBpm))
-    {
-        m_showTempoBpm = bpm;
-        emit bpmNumberChanged(qRound(bpm));
-    }
+    m_showTempoActiveId = m_showTempoId;
     m_showTempoBpm = bpm;
+
+    if (bpmNumberChange)
+        emit bpmNumberChanged(qRound(bpm));
+    if (showChanged)
+        emit showTempoChanged(m_showTempoActiveId, bpm);
 
     m_beatRequested = gridBeat;
     if (gridBeat)

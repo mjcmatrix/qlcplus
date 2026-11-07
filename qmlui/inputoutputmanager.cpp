@@ -30,6 +30,7 @@
 #include "qlcioplugin.h"
 #include "outputpatch.h"
 #include "inputpatch.h"
+#include "mastertimer.h"
 #include "universe.h"
 #include "qlcfile.h"
 #include "tardis.h"
@@ -44,6 +45,8 @@ InputOutputManager::InputOutputManager(QQuickView *view, Doc *doc, QObject *pare
     , m_profileEditor(nullptr)
     , m_editProfile(nullptr)
     , m_beatType("INTERNAL")
+    , m_showTempoId(Function::invalidId())
+    , m_showTempoBpm(0)
 {
     Q_ASSERT(m_doc != nullptr);
     m_ioMap = m_doc->inputOutputMap();
@@ -67,6 +70,9 @@ InputOutputManager::InputOutputManager(QQuickView *view, Doc *doc, QObject *pare
     connect(m_ioMap, SIGNAL(beat()), this, SIGNAL(beat()), Qt::QueuedConnection);
     connect(m_ioMap, SIGNAL(beatGeneratorTypeChanged()), this, SLOT(slotBeatTypeChanged()));
     connect(m_ioMap, SIGNAL(bpmNumberChanged(int)), this, SIGNAL(bpmNumberChanged(int)));
+    connect(m_doc->masterTimer(), &MasterTimer::showTempoChanged,
+            this, &InputOutputManager::slotShowTempoChanged, Qt::QueuedConnection);
+    connect(m_doc, &Doc::functionNameChanged, this, &InputOutputManager::slotFunctionNameChanged);
 }
 
 void InputOutputManager::slotDocLoaded()
@@ -977,5 +983,42 @@ void InputOutputManager::setBpmNumber(int bpmNumber)
 
     m_ioMap->setBpmNumber(bpmNumber);
     emit bpmNumberChanged(bpmNumber);
+}
+
+bool InputOutputManager::showTempoActive() const
+{
+    return m_showTempoId != Function::invalidId();
+}
+
+quint32 InputOutputManager::showTempoId() const
+{
+    return m_showTempoId;
+}
+
+QString InputOutputManager::showTempoName() const
+{
+    Function *show = m_doc->function(m_showTempoId);
+    return show == nullptr ? QString() : show->name();
+}
+
+double InputOutputManager::showTempoBpm() const
+{
+    return m_showTempoBpm;
+}
+
+void InputOutputManager::slotShowTempoChanged(quint32 showId, double bpm)
+{
+    if (showId == m_showTempoId && bpm == m_showTempoBpm)
+        return;
+
+    m_showTempoId = showId;
+    m_showTempoBpm = bpm;
+    emit showTempoChanged();
+}
+
+void InputOutputManager::slotFunctionNameChanged(quint32 id)
+{
+    if (id != Function::invalidId() && id == m_showTempoId)
+        emit showTempoChanged();
 }
 
