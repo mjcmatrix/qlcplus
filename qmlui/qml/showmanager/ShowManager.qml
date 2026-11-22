@@ -948,6 +948,7 @@ Rectangle
 
             ZoomItem
             {
+                id: zoomItem
                 implicitWidth: UISettings.mediumItemHeight * 1.3
                 implicitHeight: parent.height - 2
                 fontColor: "#222"

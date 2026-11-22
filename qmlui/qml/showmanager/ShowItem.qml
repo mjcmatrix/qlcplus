@@ -892,14 +892,13 @@ Item
                 var dropX = itemRoot.x + moveX
 
                 // grid snapping: snap to the nearest beat on a BPM ruler, or
-                // to the tempo section grid on a Time ruler
+                // to the tempo section grid (or else the nearest tick) on a Time ruler
                 // (skipped if already snapped to another item's edge, if the
                 // item hasn't moved horizontally, or while Ctrl suspends snapping)
                 if (showManager.gridEnabled && !itemSnapped && moveX !== 0
-                        && !snapSuspended(mouse.modifiers)
-                        && (timeDivision !== Show.Time || showManager.tempoGridActive))
+                        && !snapSuspended(mouse.modifiers))
                 {
-                    dropX = gridSnap(dropX, timeDivision !== Show.Time ? tickSize / beatsDivision : 0)
+                    dropX = gridSnap(dropX, timeDivision === Show.Time ? tickSize : tickSize / beatsDivision)
                     moveX = dropX - itemRoot.x
                 }
 

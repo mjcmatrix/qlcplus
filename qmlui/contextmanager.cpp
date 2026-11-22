@@ -648,6 +648,11 @@ void ContextManager::handleKeyPress(QKeyEvent *e)
         return;
     }
 
+    /* The view this manager was built on is the application window itself.
+     * Detached contexts forward their key presses here, so the shortcuts
+     * below work from any window */
+    App *app = qobject_cast<App *>(m_view);
+
     if (e->modifiers() & Qt::ControlModifier)
     {
         switch(e->key())
@@ -676,6 +681,14 @@ void ContextManager::handleKeyPress(QKeyEvent *e)
             case Qt::Key_Tab:
                 selectNextFixtureGroup();
             break;
+            case Qt::Key_N:
+                if (app && app->projectActionsAllowed())
+                    QMetaObject::invokeMethod(m_view->rootObject(), "newProject");
+            break;
+            case Qt::Key_O:
+                if (app && app->projectActionsAllowed())
+                    QMetaObject::invokeMethod(m_view->rootObject(), "openProject");
+            break;
             case Qt::Key_P:
                 setPositionPicking(true);
             break;
@@ -683,13 +696,24 @@ void ContextManager::handleKeyPress(QKeyEvent *e)
                 resetDumpValues();
             break;
             case Qt::Key_S:
-                QMetaObject::invokeMethod(m_view->rootObject(), "saveProject");
+                if (app && app->projectActionsAllowed())
+                {
+                    if (e->modifiers() & Qt::ShiftModifier)
+                        QMetaObject::invokeMethod(m_view->rootObject(), "saveProjectAs");
+                    else
+                        QMetaObject::invokeMethod(m_view->rootObject(), "saveProject");
+                }
             break;
             case Qt::Key_Z:
                 if (e->modifiers() & Qt::ShiftModifier)
                     Tardis::instance()->redoAction();
                 else
                     Tardis::instance()->undoAction();
+            break;
+            case Qt::Key_F11:
+                /* Available at any access level: it only affects the window */
+                if (app)
+                    app->toggleFullscreen();
             break;
             default:
             break;
